@@ -226,8 +226,8 @@ random_address() {
 }
 
 append_base_employee_fields() {
-  local -n fields=$1
-  fields+=(
+  local -n _ref=$1
+  _ref+=(
     "$(json_string_pair name "$2")"
     "$(json_string_pair last_name "$3")"
     "$(json_number_pair salary "$4")"
@@ -236,12 +236,12 @@ append_base_employee_fields() {
 }
 
 append_deu_doc_fields() {
-  local -n fields=$1
+  local -n _ref=$1
   local slug=$2 index=$3 field
 
   for field in "${DOC_FIELDS[@]}"; do
     if (( RANDOM % 2 == 0 )); then
-      fields+=("$(json_string_pair "$field" "https://hr-docs.example.com/deu/${field}/${slug}-${index}.pdf")")
+      _ref+=("$(json_string_pair "$field" "https://hr-docs.example.com/deu/${field}/${slug}-${index}.pdf")")
     fi
   done
 }
