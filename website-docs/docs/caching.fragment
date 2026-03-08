@@ -1,29 +1,150 @@
 <h1>Caching Strategy</h1>
 
-  <p>Redis 7-alpine with AOF persistence provides the caching layer. Cache invalidation is event-driven — triggered automatically when the EventProcessingPipeline processes employee events.</p>
+  <p>Redis 7-alpine with AOF persistence protects the hot read path. The design avoids expensive fan-out invalidation: employee list caches are invalidated logically with a version counter, while per-employee checklist caches are rebuilt eagerly inside the event pipeline.</p>
 
-  <h2>Cache Keys</h2>
-  <table>
-    <thead><tr><th>Pattern</th><th>TTL</th><th>Purpose</th><th>Invalidation</th></tr></thead>
-    <tbody>
-      <tr><td><code>employees:{country}:page:{n}:per:{m}</code></td><td>1 hour</td><td>Paginated employee lists</td><td>Any employee event for country</td></tr>
-      <tr><td><code>checklist:{country}:{employeeId}</code></td><td>1 hour</td><td>Per-employee checklist</td><td>Employee event + eager rebuild</td></tr>
-    </tbody>
-  </table>
-
-  <h2>Eager Rebuild</h2>
-  <div class="callout callout-success">
-    <strong>Checklist caches use eager rebuild</strong> — after invalidation, the new value is immediately recalculated and cached. This means the next API request always hits warm cache.
+  <div class="stat-grid">
+    <div class="stat-box">
+      <div class="stat-number">2</div>
+      <div class="stat-label">Cache families</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">1h</div>
+      <div class="stat-label">TTL per key</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">O(1)</div>
+      <div class="stat-label">List invalidation</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">Warm</div>
+      <div class="stat-label">Checklist after event</div>
+    </div>
   </div>
 
-  <h2>Cache Flow</h2>
-  <pre class="mermaid">
-graph LR
-    Event[Employee Event] -->|Pipeline| IC[Invalidate Cache]
-    IC -->|Clear| EC[Employee Cache<br/>Pages 1-100]
-    IC -->|Clear + Rebuild| CC[Checklist Cache<br/>Eager Rebuild]
+  <div class="callout callout-success">
+    <strong>Key design choice:</strong> version-counter invalidation replaces mass key deletion. When a country changes, the system advances one version key instead of deleting every paginated cache entry.
+  </div>
 
-    API[API Request] -->|Cache Hit| Redis[(Redis)]
-    API -->|Cache Miss| DB[(PostgreSQL)]
-    DB -->|Store| Redis
+  <pre class="code-block"><code>Event arrives -> increment employees:{country}:v from 3 to 4
+Next read    -> look up employees:USA:v4:p1:pp15 -> miss -> rebuild -> cache set
+Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
+
+  <h2>Two Cache Patterns</h2>
+  <p>The platform uses two cache families because list endpoints and per-employee checklist endpoints have different access patterns and different warm-path goals.</p>
+
+  <div class="pattern-grid">
+    <article class="pattern-card">
+      <div class="pattern-card-head">
+        <div class="pattern-card-title">
+          <span class="pattern-badge">Hub Lists</span>
+          <h3>Versioned Employee Pages</h3>
+        </div>
+        <code class="pattern-entry">employees:v</code>
+      </div>
+      <p>Paginated employee lists optimize the broad read path. They are cheap to invalidate because the system never loops over every cached page key for a country.</p>
+      <div class="pattern-steps">
+        <div class="pattern-step">
+          <span class="pattern-step-index">1</span>
+          <div class="pattern-step-body">
+            <strong>Embed the version in the page key</strong>
+            <span>List reads resolve keys like <code>employees:{country}:v{version}:p{page}:pp{perPage}</code>.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">2</span>
+          <div class="pattern-step-body">
+            <strong>Advance one country-scoped counter</strong>
+            <span>Any employee event increments <code>employees:{country}:v</code>, which makes the next read look at a new logical keyspace.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">3</span>
+          <div class="pattern-step-body">
+            <strong>Let stale pages expire naturally</strong>
+            <span>Old versioned keys stay in Redis until TTL expires, so invalidation work stays constant regardless of page count.</span>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="pattern-card">
+      <div class="pattern-card-head">
+        <div class="pattern-card-title">
+          <span class="pattern-badge">Checklist Reads</span>
+          <h3>Eager Per-Employee Rebuild</h3>
+        </div>
+        <code class="pattern-entry">checklist</code>
+      </div>
+      <p>Checklist caches optimize the narrow read path. The pipeline invalidates the affected employee key and immediately repopulates it so the next API call stays on the warm path.</p>
+      <div class="pattern-steps">
+        <div class="pattern-step">
+          <span class="pattern-step-index">1</span>
+          <div class="pattern-step-body">
+            <strong>Store one key per employee</strong>
+            <span>The cache key format is <code>checklist:{country}:{employeeId}</code>, with a one-hour TTL.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">2</span>
+          <div class="pattern-step-body">
+            <strong>Invalidate only the touched checklist</strong>
+            <span>When an employee event lands, the affected checklist cache entry is cleared instead of flushing unrelated employee data.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">3</span>
+          <div class="pattern-step-body">
+            <strong>Rebuild inside the same event cycle</strong>
+            <span>The new value is recalculated immediately, so the next checklist request hits Redis instead of waiting for a first-request miss.</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <h2>Event-To-Read Lifecycle</h2>
+
+  <div class="step">
+    <div class="step-number">1</div>
+    <h3>Event processing decides which cache family changed</h3>
+    <p>The <code>EventProcessingPipeline</code> handles employee create, update, and delete events and triggers the matching cache invalidation path automatically.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-number">2</div>
+    <h3>List caches invalidate logically, not physically</h3>
+    <p>The pipeline advances the country version counter, so paginated employee reads start resolving fresh keys without paying the cost of deleting every older page entry.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-number">3</div>
+    <h3>Checklist reads are re-warmed immediately</h3>
+    <p>The affected checklist cache entry is recalculated during event handling, which keeps the next employee checklist lookup on a warm key.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-number">4</div>
+    <h3>API requests stay simple</h3>
+    <p>Reads first check Redis. On a hit they return immediately; on a miss they load from PostgreSQL once, write the new cache value, and subsequent requests reuse it.</p>
+  </div>
+
+  <pre class="mermaid">
+flowchart TD
+    Event[Employee event] --> Pipeline[EventProcessingPipeline]
+    Pipeline --> Version[Advance list version]
+    Pipeline --> Checklist[Rebuild checklist key]
+
+    Request[API request] --> Hit{Cache hit?}
+    Hit -->|Yes| Redis[(Redis)]
+    Hit -->|No| Db[(PostgreSQL)]
+    Db --> Write[Write fresh cache]
+    Write --> Redis
   </pre>
+
+  <h2>Redis Runtime</h2>
+  <div class="card-grid">
+    <div class="card"><strong>Persistence</strong><span>AOF uses <code>appendfsync everysec</code>, which balances durability with steady Redis throughput.</span></div>
+    <div class="card"><strong>Container Durability</strong><span>The named <code>redis-data</code> volume keeps cache state and append-only files across container restarts.</span></div>
+    <div class="card"><strong>Laravel Integration</strong><span>The Hub Service uses Redis as the default cache store, so read endpoints stay close to the application hot path.</span></div>
+    <div class="card"><strong>Warm-Path Outcome</strong><span>After events refresh the relevant keys, normal API usage trends toward Redis hits instead of repeat database work.</span></div>
+  </div>

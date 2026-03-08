@@ -72,6 +72,7 @@ The static docs site intended for GitHub Pages lives in [website-docs/](website-
 | [CQRS](docs/cqrs.md) | Write/read separation and projection model |
 | [Event Flow](docs/eventflow.md) | RabbitMQ flow, retries, DLQ, consumer pipeline |
 | [Caching](docs/caching.md) | Cache strategy and invalidation rules |
+| [Performance & Optimization](docs/performance-optimization.md) | Cross-layer performance decisions, caching, indexing, Docker, and observability optimizations |
 | [Countries](docs/countries.md) | Country-specific behavior and extensibility |
 | [API Reference](docs/api.md) | Endpoints, validation, and response formats |
 | [Testing](docs/testing.md) | Test suites and execution commands |
@@ -126,13 +127,3 @@ At a high level, the HR service owns writes, RabbitMQ carries employee lifecycle
 - Run Docker Compose from the repository root.
 - Use the docs for API payloads, event schemas, country rules, test commands, and architectural detail.
 - Keep the README as the entry point, not the full system manual.
-
-## GitHub Pages
-
-GitHub Pages can only publish from a branch root or a `/docs` folder when using branch-based publishing. Because this repo keeps the generated site in [website-docs/](website-docs/), the repo uses the workflow in [.github/workflows/deploy-website-docs.yml](.github/workflows/deploy-website-docs.yml) to publish that directory directly.
-
-To enable it in GitHub:
-
-1. Open repository Settings, then Pages.
-2. Set Source to GitHub Actions.
-3. Push changes to `main` that update [website-docs/](website-docs/), or run the workflow manually from Actions.

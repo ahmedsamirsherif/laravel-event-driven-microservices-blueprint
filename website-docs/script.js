@@ -12,7 +12,7 @@
 
   /* ── Panel content loading ─────────────────────────── */
   const loadedPanels = new Set();
-  const docsVersion = '10';
+  const docsVersion = '11';
 
   function sanitizePanelHtml(html) {
     return html.replace(/<!-- Code injected by live-server -->[\s\S]*?<\/script>/gi, '');
@@ -43,6 +43,7 @@
     cqrs:          'CQRS Pattern',
     eventflow:     'Event Flow',
     caching:       'Caching Strategy',
+    'performance-optimization': 'Performance & Optimization',
     api:           'API Reference',
     countries:     'Countries',
     countryresolver: 'Country Resolver Lifecycle',

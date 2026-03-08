@@ -1,0 +1,196 @@
+<h1>Performance &amp; Optimization</h1>
+
+  <p>The platform applies targeted optimizations at every layer: RabbitMQ connectivity, cache invalidation, indexing, event processing, Docker images, and observability. This page consolidates the performance-critical decisions that keep the write path predictable and the read path fast.</p>
+
+  <div class="card-grid">
+    <div class="card"><strong>Messaging</strong><span>Persistent publisher connections, long-lived consumers, durable topology, bounded retries</span></div>
+    <div class="card"><strong>Caching</strong><span>Version-based invalidation, per-employee checklist caching, eager rebuild, metrics-backed hit tracking</span></div>
+    <div class="card"><strong>Database</strong><span>Purpose-built indices, database-side aggregations, no full-table scans on normal read paths</span></div>
+    <div class="card"><strong>Runtime</strong><span>Optimized autoloading, opcache, multi-stage images, health-gated startup, in-memory metrics collection</span></div>
+  </div>
+
+  <h2>RabbitMQ Connection Management</h2>
+  <p>The HR publisher keeps a <strong>persistent, lazy connection</strong> with connection health checks and transparent reconnection. It reuses the existing AMQP connection while it is alive and only opens a new connection after a failure. That avoids paying a TCP plus AMQP handshake on every publish while still recovering cleanly from broker restarts.</p>
+
+  <p>The Hub consumer opens a <strong>single long-lived connection</strong> for the entire lifetime of the <code>rabbitmq:consume</code> process. Exchange and queue declarations happen once at startup, not per message. The one-second <code>wait()</code> timeout lets the loop check the stop flag frequently enough for clean container shutdown without busy waiting.</p>
+
+  <div class="pattern-grid">
+    <article class="pattern-card">
+      <div class="pattern-card-head">
+        <div class="pattern-card-title">
+          <span class="pattern-badge">HR Service</span>
+          <h3>Publisher Connection Pattern</h3>
+        </div>
+        <code class="pattern-entry">channel()</code>
+      </div>
+      <p>The publisher keeps the hot path short: reuse the connection when healthy, reconnect only on failure, and keep topology declaration tied to connection lifecycle.</p>
+      <div class="pattern-steps">
+        <div class="pattern-step">
+          <span class="pattern-step-index">1</span>
+          <div class="pattern-step-body">
+            <strong>Reuse the live channel</strong>
+            <span>If the AMQP connection is still healthy, publish through the existing channel instead of opening a new socket.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">2</span>
+          <div class="pattern-step-body">
+            <strong>Reconnect on failure</strong>
+            <span>If the connection is absent or dead, disconnect cleanly and create a fresh <code>AMQPStreamConnection</code>.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">3</span>
+          <div class="pattern-step-body">
+            <strong>Declare topology once per connection</strong>
+            <span><code>exchange_declare</code> runs when the connection comes up, keeping publish calls lightweight while preserving durability.</span>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article class="pattern-card">
+      <div class="pattern-card-head">
+        <div class="pattern-card-title">
+          <span class="pattern-badge">Hub Consumer</span>
+          <h3>Consumer Runtime Topology</h3>
+        </div>
+        <code class="pattern-entry">consume()</code>
+      </div>
+      <p>The consumer is optimized for steady-state throughput: one process, one connection, bounded in-flight work, and predictable shutdown behavior.</p>
+      <div class="pattern-steps">
+        <div class="pattern-step">
+          <span class="pattern-step-index">1</span>
+          <div class="pattern-step-body">
+            <strong>One connection for the full process lifetime</strong>
+            <span>The consumer keeps a single AMQP connection open instead of reconnecting per message.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">2</span>
+          <div class="pattern-step-body">
+            <strong>Bound concurrency with QoS</strong>
+            <span><code>basic_qos(prefetchCount=1)</code> limits the consumer to one unacked message at a time.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">3</span>
+          <div class="pattern-step-body">
+            <strong>Declare exchange and queue once at startup</strong>
+            <span>Topology setup happens during boot, so the message loop does only processing and acknowledgment work.</span>
+          </div>
+        </div>
+        <div class="pattern-step">
+          <span class="pattern-step-index">4</span>
+          <div class="pattern-step-body">
+            <strong>Poll with a 1-second wait loop</strong>
+            <span><code>while(is_consuming &amp;&amp; !shouldStop) -&gt; wait(1s)</code> stays responsive to stop signals without busy waiting.</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <h2>Caching Strategy</h2>
+  <div class="callout callout-success">
+    <strong>Key design choice:</strong> version-counter invalidation replaces mass key deletion. Old paginated keys are left to expire naturally after the version counter advances.
+  </div>
+
+  <p>Instead of deleting every cached page key for a country, the system maintains a single version counter like <code>employees:{country}:v</code>. Paginated list keys embed that version, so a single increment invalidates the full logical set with O(1) work.</p>
+
+  <div class="sequence-flow">
+    <div class="sequence-flow-head">
+      <span class="pattern-badge">Cache Example</span>
+      <h3>Versioned invalidation in one event cycle</h3>
+      <p>One counter increment shifts all future list reads to a fresh keyspace without issuing a bulk delete.</p>
+    </div>
+    <div class="sequence-flow-track">
+      <article class="sequence-node">
+        <span class="sequence-node-label">1. Event</span>
+        <strong>Advance the country version</strong>
+        <p>Increment <code>employees:{country}:v</code> from <code>3</code> to <code>4</code>.</p>
+      </article>
+      <div class="sequence-flow-arrow" aria-hidden="true">→</div>
+      <article class="sequence-node">
+        <span class="sequence-node-label">2. Next read</span>
+        <strong>Resolve a fresh list key</strong>
+        <p>Look up <code>employees:USA:v4:p1:pp15</code>, miss once, rebuild the page, then write the new cache entry.</p>
+      </article>
+      <div class="sequence-flow-arrow" aria-hidden="true">→</div>
+      <article class="sequence-node">
+        <span class="sequence-node-label">3. Old keys</span>
+        <strong>Let stale pages age out</strong>
+        <p>Older keys like <code>employees:USA:v3:*</code> stay harmless and expire naturally through TTL.</p>
+      </article>
+    </div>
+  </div>
+
+  <p>Checklist caching is more aggressive: each employee gets an individual key like <code>checklist:{country}:{employeeId}</code>. When an employee event lands, the specific employee checklist and the country summary are invalidated, and the consumer immediately re-warms the checklist inside the same event-handling cycle. That keeps the next checklist read as a cache hit.</p>
+
+  <p>When the checklist controller builds a paginated response, it reuses already cached per-employee checklist entries where possible. On a miss, it computes from the already-loaded model data rather than issuing extra reads. Prometheus hit and miss counters are incremented before cache resolution so effectiveness is measurable without changing caching behavior.</p>
+
+  <h2>Database Indices</h2>
+  <p>Every primary query path is backed by an index tailored to the actual access pattern.</p>
+
+  <table>
+    <thead><tr><th>Table</th><th>Index</th><th>Type</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td><code>employees</code></td><td><code>(country)</code></td><td>regular</td><td>Country filter in HR list API</td></tr>
+      <tr><td><code>employees</code></td><td><code>(country, created_at)</code></td><td>composite</td><td>Paginated listing with country filter and chronological ordering</td></tr>
+      <tr><td><code>employee_media</code></td><td><code>(employee_id, document_type, is_current)</code></td><td>composite</td><td>Current document lookup by employee and type</td></tr>
+      <tr><td><code>employee_projections</code></td><td><code>(country)</code></td><td>regular</td><td>Hub read-model country filter</td></tr>
+      <tr><td><code>employee_projections</code></td><td><code>(country, employee_id)</code></td><td>composite</td><td>Country-scoped employee lookup</td></tr>
+      <tr><td><code>employee_projections</code></td><td><code>(employee_id)</code></td><td>unique</td><td>Upsert target and 1:1 projection guarantee</td></tr>
+      <tr><td><code>event_log</code></td><td><code>(event_type, country)</code></td><td>composite</td><td>Event filtering and replay queries</td></tr>
+      <tr><td><code>event_log</code></td><td><code>(status, received_at)</code></td><td>composite</td><td>Failed and pending event scans in chronological order</td></tr>
+      <tr><td><code>event_log</code></td><td><code>(employee_id)</code></td><td>regular</td><td>Trace all events for one employee</td></tr>
+      <tr><td><code>processed_events</code></td><td><code>(event_id)</code></td><td>unique</td><td>Single-query idempotency lookup</td></tr>
+    </tbody>
+  </table>
+
+  <p>Column sizing also stays intentional: <code>country</code> is a short <code>VARCHAR(10)</code>, <code>ssn</code> is sized to the exact masked format, <code>tax_id</code> has headroom without waste, and <code>salary</code> uses <code>DECIMAL(12,2)</code> to avoid floating-point drift.</p>
+
+  <h2>DDD &amp; Architecture Optimizations</h2>
+  <div class="callout">
+    <strong>Architectural optimization:</strong> domain logic is isolated from infrastructure so it cannot accidentally trigger I/O. Side effects only happen at the Application and Infrastructure boundaries.
+  </div>
+
+  <p>Immutable DTOs and value objects use <code>final readonly</code> semantics, which allows safe pass-by-reference without defensive copying. Validation is front-loaded into constructors, making invalid states unrepresentable and reducing repeated validation cost later in the flow.</p>
+
+  <p>Country auto-discovery is convention based. Reflection runs once during application lifecycle to discover country modules, and resolved instances are cached. Combined with singleton registries, subsequent country lookups are O(1) map reads rather than repeated reflection or service registration work.</p>
+
+  <p>On the write side, partial repository updates send only changed fields to the database. On the read side, employee counts and average salary are pushed down into PostgreSQL with <code>COUNT(*)</code> and <code>AVG()</code> instead of hydrating result sets in PHP.</p>
+
+  <h2>Event Pipeline Optimizations</h2>
+  <ul>
+    <li><strong>Idempotency:</strong> every event carries a UUID and is checked against the unique-indexed <code>processed_events.event_id</code> before work begins.</li>
+    <li><strong>Short-circuit handler resolution:</strong> the event pipeline returns immediately after the first handler that supports the event.</li>
+    <li><strong>Atomic projection writes:</strong> <code>updateOrCreate()</code> keeps projection updates as a single logical write path.</li>
+    <li><strong>Broadcast isolation:</strong> WebSocket failures are handled after the main pipeline work and do not trigger a full event retry.</li>
+  </ul>
+
+  <h2>Message Reliability</h2>
+  <table>
+    <thead><tr><th>Mechanism</th><th>What It Protects</th></tr></thead>
+    <tbody>
+      <tr><td>Persistent AMQP messages</td><td>Survive broker restarts</td></tr>
+      <tr><td>Durable exchanges and queues</td><td>Preserve topology across restarts</td></tr>
+      <tr><td>DLX + exponential backoff</td><td>Bounded retries with 1s, 2s, and 4s delays</td></tr>
+      <tr><td>Manual acknowledgment</td><td>Messages are removed only after explicit success</td></tr>
+      <tr><td>Graceful shutdown handlers</td><td>Current message finishes before the consumer stops</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Docker &amp; Infrastructure</h2>
+  <p>Multi-stage Dockerfiles reduce production image size by installing build tools only where needed and removing them after extension compilation. Composer dependencies are copied before application source so dependency layers stay cached when code changes.</p>
+
+  <p>Alpine images keep the full stack lean, optimized Composer autoloading reduces filesystem lookups, and PHP opcache removes repeated source parsing. Redis AOF persistence balances durability with throughput, while health-gated startup in Docker Compose prevents services from racing databases or the broker during boot.</p>
+
+  <p>The Hub health endpoint validates the real data path rather than only liveness: it performs a write-read-delete cycle against Redis and a real <code>SELECT 1</code> against PostgreSQL.</p>
+
+  <h2>Observability</h2>
+  <p>Both services use an in-memory Prometheus collector, which avoids a Redis round trip on every counter increment. Metrics are rendered only when Prometheus scrapes <code>/api/metrics</code>.</p>
+
+  <p>Histogram buckets are tuned to the workloads they measure: HTTP request latency spans 10ms to 5s, event processing spans 1ms to 1s, and event publishing uses sub-second buckets. Endpoint normalization replaces dynamic path segments with placeholders, which preserves useful per-endpoint visibility without cardinality explosion.</p>
+
+  <p>Structured logging closes the loop: request IDs are propagated through middleware, and event-processing steps are logged with context like event type, country, employee ID, duration, and retry count. Fatal failures are logged at <code>error</code>, non-fatal broadcast issues at <code>warning</code>, and normal execution at <code>info</code>.</p>
