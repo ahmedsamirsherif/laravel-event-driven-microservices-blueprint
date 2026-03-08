@@ -43,7 +43,7 @@ final class HealthController extends Controller
         $statusCode = $overallStatus === 'ok' ? 200 : 503;
 
         if ($overallStatus !== 'ok') {
-            Log::warning('Hub service health check degraded', ['checks' => $checks]);
+            Log::warning('[HealthController][__invoke] Hub service health check degraded', ['checks' => $checks]);
         }
 
         return response()->json([

@@ -40,6 +40,9 @@ final class EmployeeCreatedHandler implements EventHandlerInterface
             employeeData: $employee,
         ));
 
-        Log::info('EmployeeCreated handled', ['employee_id' => $employeeId, 'country' => $country]);
+        Log::info('[EmployeeCreatedHandler][handle] Employee created event handled', [
+            'employee_id' => $employeeId,
+            'country' => $country,
+        ]);
     }
 }

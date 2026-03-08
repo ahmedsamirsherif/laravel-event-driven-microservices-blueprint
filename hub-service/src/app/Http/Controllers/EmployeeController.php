@@ -43,7 +43,7 @@ final class EmployeeController extends Controller
         $columns    = $this->registry->for($country)->tableColumns();
         $avgSalary  = (float) cache()->remember($avgKey, self::CACHE_TTL, fn () => $this->repository->averageSalaryByCountry($country));
 
-        Log::debug('Employee list served', [
+        Log::debug('[EmployeeController][index] Employee list served', [
             'country' => $country,
             'page' => $page,
             'per_page' => $perPage,

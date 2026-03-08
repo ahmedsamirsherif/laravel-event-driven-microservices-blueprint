@@ -38,7 +38,7 @@ final class EmployeeController extends Controller
     {
         $employee = $action->execute(CreateEmployeeDTO::fromArray($request->validated()));
 
-        Log::info('Employee created', [
+        Log::info('[EmployeeController][store] Employee created', [
             'employee_id' => $employee->id,
             'country' => $employee->country,
         ]);
@@ -58,7 +58,7 @@ final class EmployeeController extends Controller
 
         $employee = $action->execute($employee, UpdateEmployeeDTO::fromArray($validated));
 
-        Log::info('Employee updated', [
+        Log::info('[EmployeeController][update] Employee updated', [
             'employee_id' => $employee->id,
             'country' => $employee->country,
             'changed_fields' => array_keys($validated),
@@ -73,7 +73,7 @@ final class EmployeeController extends Controller
 
         $action->execute($employee);
 
-        Log::info('Employee deleted', [
+        Log::info('[EmployeeController][destroy] Employee deleted', [
             'employee_id' => $employee->id,
             'country' => $employee->country,
         ]);

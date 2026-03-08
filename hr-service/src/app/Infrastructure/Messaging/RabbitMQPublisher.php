@@ -35,15 +35,15 @@ final class RabbitMQPublisher
 
             $this->channel()->basic_publish($msg, self::EXCHANGE, $routingKey);
 
-            Log::info('Event published', [
+            Log::info('[RabbitMQPublisher][publish] Event published', [
                 'routing_key' => $routingKey,
                 'event_id' => $payload['event_id'] ?? 'unknown',
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to publish event', [
+            Log::error('[RabbitMQPublisher][publish] Failed to publish event', [
                 'routing_key' => $routingKey,
                 'event_id' => $payload['event_id'] ?? 'unknown',
-                'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             $this->disconnect();

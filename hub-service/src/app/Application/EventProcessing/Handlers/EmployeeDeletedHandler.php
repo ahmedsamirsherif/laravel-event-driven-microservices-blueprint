@@ -40,6 +40,9 @@ final class EmployeeDeletedHandler implements EventHandlerInterface
             employeeData: $employee,
         ));
 
-        Log::info('EmployeeDeleted handled', ['employee_id' => $employeeId, 'country' => $country]);
+        Log::info('[EmployeeDeletedHandler][handle] Employee deleted event handled', [
+            'employee_id' => $employeeId,
+            'country' => $country,
+        ]);
     }
 }

@@ -68,7 +68,10 @@ class ConsistencyCheckCommand extends Command
                 $this->fixOrphanedProjections();
             }
 
-            Log::warning('Consistency check failed: HR=0, Hub='.$hubTotal);
+            Log::warning('[ConsistencyCheckCommand][handle] Consistency check failed', [
+                'hr_total' => 0,
+                'hub_total' => $hubTotal,
+            ]);
 
             return Command::FAILURE;
         }

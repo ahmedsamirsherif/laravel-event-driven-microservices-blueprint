@@ -28,9 +28,10 @@ final class EventProcessingPipeline
         $employeeId = $payload['data']['employee_id'] ?? null;
 
         if ($eventId && ProcessedEvent::where('event_id', $eventId)->exists()) {
-            Log::info('EventProcessingPipeline: duplicate event skipped', [
+            Log::info('[EventProcessingPipeline][process] Duplicate event skipped', [
                 'event_id'   => $eventId,
                 'event_type' => $eventType,
+                'country'    => $country,
             ]);
             return;
         }
@@ -53,9 +54,11 @@ final class EventProcessingPipeline
 
         foreach ($this->handlers as $handler) {
             if ($handler->supports($payload)) {
-                Log::info('EventProcessingPipeline: dispatching to handler', [
+                Log::info('[EventProcessingPipeline][process] Dispatching event to handler', [
                     'handler'    => get_class($handler),
                     'event_type' => $eventType,
+                    'event_id'   => $eventId,
+                    'country'    => $country,
                 ]);
 
                 try {
@@ -82,8 +85,10 @@ final class EventProcessingPipeline
             }
         }
 
-        Log::warning('EventProcessingPipeline: no handler for event', [
+        Log::warning('[EventProcessingPipeline][process] No handler found for event', [
+            'event_id'   => $eventId,
             'event_type' => $eventType,
+            'country'    => $country,
         ]);
 
         $logEntry?->update(['status' => 'failed', 'error_message' => "No handler for {$eventType}"]);

@@ -17,7 +17,7 @@ final class AddRequestId
         $requestId = $request->header('X-Request-ID') ?? (string) Str::uuid();
 
         $request->headers->set('X-Request-ID', $requestId);
-        Log::withContext(['request_id' => $requestId]);
+        Log::shareContext(['request_id' => $requestId]);
 
         $response = $next($request);
         $response->headers->set('X-Request-ID', $requestId);

@@ -41,6 +41,9 @@ final class EmployeeUpdatedHandler implements EventHandlerInterface
             changedFields: $payload['data']['changed_fields'] ?? [],
         ));
 
-        Log::info('EmployeeUpdated handled', ['employee_id' => $employeeId, 'country' => $country]);
+        Log::info('[EmployeeUpdatedHandler][handle] Employee updated event handled', [
+            'employee_id' => $employeeId,
+            'country' => $country,
+        ]);
     }
 }

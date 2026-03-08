@@ -63,10 +63,11 @@ final class PublishEmployeeEventToRabbitMQ
             $this->metrics->recordEventPublishDuration($eventType, microtime(true) - $publishStart);
         } catch (\Throwable $e) {
             $this->metrics->incrementEventPublishFailure($eventType, $country);
-            Log::error('Failed to publish employee event', [
+            Log::error('[PublishEmployeeEventToRabbitMQ][publish] Failed to publish employee event', [
                 'event_type' => $eventType,
                 'employee_id' => $employee->id,
-                'error' => $e->getMessage(),
+                'country' => $country,
+                'exception' => $e,
             ]);
         }
     }

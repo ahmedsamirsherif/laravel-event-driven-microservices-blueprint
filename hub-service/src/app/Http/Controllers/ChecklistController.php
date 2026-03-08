@@ -27,7 +27,7 @@ final class ChecklistController extends Controller
         $summary = $this->checklistService->getSummary($country);
         $paginated = $this->checklistService->getPaginatedChecklists($country, $page, $perPage);
 
-        Log::debug('Checklist served', [
+        Log::debug('[ChecklistController][show] Checklist served', [
             'country' => $country,
             'page' => $page,
             'per_page' => $perPage,

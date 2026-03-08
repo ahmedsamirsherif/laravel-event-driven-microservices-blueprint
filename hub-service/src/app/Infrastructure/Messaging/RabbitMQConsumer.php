@@ -63,7 +63,7 @@ final class RabbitMQConsumer
             $this->processMessage($msg);
         });
 
-        Log::info('RabbitMQ consumer started', ['queue' => self::QUEUE]);
+        Log::info('[RabbitMQConsumer][consume] RabbitMQ consumer started', ['queue' => self::QUEUE]);
 
         while ($channel->is_consuming() && ! $this->shouldStop) {
             try {
@@ -76,7 +76,7 @@ final class RabbitMQConsumer
         $channel->close();
         $connection->close();
 
-        Log::info('RabbitMQ consumer stopped gracefully');
+        Log::info('[RabbitMQConsumer][consume] RabbitMQ consumer stopped gracefully');
     }
 
     /**
@@ -125,7 +125,7 @@ final class RabbitMQConsumer
 
                 $this->metrics->incrementWebsocketBroadcast($eventType);
 
-                Log::info('Broadcast sent via Reverb', [
+                Log::info('[RabbitMQConsumer][processMessage] Broadcast sent via Reverb', [
                     'event_type'  => $eventType,
                     'employee_id' => $employeeId,
                     'country'     => $country,
@@ -134,17 +134,18 @@ final class RabbitMQConsumer
             } catch (\Throwable $broadcastError) {
                 $this->metrics->incrementWebsocketBroadcastFailure($eventType);
 
-                Log::warning('Broadcast to Reverb failed (non-fatal)', [
+                Log::warning('[RabbitMQConsumer][processMessage] Broadcast to Reverb failed', [
                     'event_type'  => $eventType,
                     'employee_id' => $employeeId,
-                    'error'       => $broadcastError->getMessage(),
+                    'country'     => $country,
+                    'exception'   => $broadcastError,
                 ]);
             }
 
             $this->metrics->incrementEventsProcessed($eventType);
             $this->metrics->recordEventProcessingDuration($eventType, microtime(true) - $startTime);
 
-            Log::info('Event fully processed', [
+            Log::info('[RabbitMQConsumer][processMessage] Event fully processed', [
                 'event_type'   => $eventType,
                 'employee_id'  => $employeeId,
                 'country'      => $country,
@@ -154,10 +155,10 @@ final class RabbitMQConsumer
 
             $msg->ack();
         } catch (\Throwable $e) {
-            Log::error('Failed to process RabbitMQ message', [
+            Log::error('[RabbitMQConsumer][processMessage] Failed to process RabbitMQ message', [
                 'event_type'  => $eventType,
                 'retry_count' => $retryCount,
-                'error'       => $e->getMessage(),
+                'exception'   => $e,
             ]);
             $this->metrics->incrementEventProcessingErrors($eventType);
 
@@ -168,7 +169,7 @@ final class RabbitMQConsumer
                 $this->metrics->incrementEventRetry($eventType);
             } else {
                 // Max retries exceeded — send to DLQ
-                Log::warning('Message exhausted retries, sending to DLQ', [
+                Log::warning('[RabbitMQConsumer][processMessage] Message exhausted retries; routing to DLQ', [
                     'event_type'  => $eventType,
                     'retry_count' => $retryCount,
                 ]);
@@ -199,7 +200,7 @@ final class RabbitMQConsumer
         $channel->basic_publish($newMsg, self::EXCHANGE, $msg->getRoutingKey());
         $msg->ack(); // ack original before republishing
 
-        Log::info('Message re-queued for retry', [
+        Log::info('[RabbitMQConsumer][requeueWithDelay] Message re-queued for retry', [
             'retry_count' => $newRetryCount,
             'delay_ms'    => $delayMs,
         ]);
@@ -210,11 +211,11 @@ final class RabbitMQConsumer
         if (extension_loaded('pcntl')) {
             pcntl_async_signals(true);
             pcntl_signal(SIGTERM, function (): void {
-                Log::info('Received SIGTERM - stopping consumer gracefully');
+                Log::info('[RabbitMQConsumer][setupSignalHandlers] Received SIGTERM; stopping consumer gracefully');
                 $this->shouldStop = true;
             });
             pcntl_signal(SIGINT, function (): void {
-                Log::info('Received SIGINT - stopping consumer gracefully');
+                Log::info('[RabbitMQConsumer][setupSignalHandlers] Received SIGINT; stopping consumer gracefully');
                 $this->shouldStop = true;
             });
         }

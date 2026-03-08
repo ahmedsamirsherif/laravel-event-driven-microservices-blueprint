@@ -33,11 +33,11 @@ final class RecordRequestMetrics
                 duration: $duration,
             );
         } catch (\Throwable $e) {
-            Log::warning('Request metrics recording failed', [
+            Log::warning('[RecordRequestMetrics][handle] Request metrics recording failed', [
                 'method' => $request->method(),
                 'endpoint' => $endpoint,
                 'status' => $response->getStatusCode(),
-                'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
         }
 

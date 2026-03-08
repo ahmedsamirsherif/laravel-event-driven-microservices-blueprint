@@ -27,9 +27,8 @@ class Handler extends ExceptionHandler
         });
 
         $this->renderable(function (Throwable $e) {
-            Log::error('Unhandled exception', [
-                'exception' => get_class($e),
-                'message' => $e->getMessage(),
+            Log::error('[Handler][register] Unhandled exception', [
+                'exception' => $e,
             ]);
 
             return response()->json([
