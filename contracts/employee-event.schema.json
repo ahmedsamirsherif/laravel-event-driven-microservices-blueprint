@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Employee Event Payload",
+  "description": "Contract between HR Service (publisher) and Hub Service (consumer)",
+  "type": "object",
+  "required": ["event_type", "event_id", "timestamp", "country", "schema_version", "data"],
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": ["EmployeeCreated", "EmployeeUpdated", "EmployeeDeleted"]
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "country": {
+      "type": "string",
+      "enum": ["USA", "DEU"]
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "data": {
+      "type": "object",
+      "required": ["employee_id"],
+      "properties": {
+        "employee_id": { "type": "integer", "minimum": 1 },
+        "changed_fields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "employee": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "name": { "type": "string" },
+            "last_name": { "type": "string" },
+            "salary": { "type": "number", "minimum": 0 },
+            "country": { "type": "string", "enum": ["USA", "DEU"] },
+            "ssn": { "type": ["string", "null"] },
+            "address": { "type": ["string", "null"] },
+            "goal":                    { "type": ["string", "null"] },
+            "tax_id":                  { "type": ["string", "null"] },
+            "doc_work_permit":         { "type": ["string", "null"], "format": "uri" },
+            "doc_tax_card":            { "type": ["string", "null"], "format": "uri" },
+            "doc_health_insurance":    { "type": ["string", "null"], "format": "uri" },
+            "doc_social_security":     { "type": ["string", "null"], "format": "uri" },
+            "doc_employment_contract": { "type": ["string", "null"], "format": "uri" }
+          }
+        }
+      }
+    }
+  }
+}

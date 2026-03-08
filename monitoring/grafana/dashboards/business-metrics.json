@@ -1,0 +1,141 @@
+{
+  "annotations": {"list": []},
+  "description": "Business activity metrics derived from event flow and API usage",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "title": "Employee Activity Overview", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_events_published_total{event_type=\"EmployeeCreated\"}[24h]))", "refId": "A"}],
+      "title": "Employees Created (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_events_published_total{event_type=\"EmployeeUpdated\"}[24h]))", "refId": "A"}],
+      "title": "Employees Updated (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_events_published_total{event_type=\"EmployeeDeleted\"}[24h]))", "refId": "A"}],
+      "title": "Employees Deleted (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "unit": "percentunit", "decimals": 1, "min": 0, "max": 1}, "overrides": []},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "1 - (sum(rate(app_event_processing_errors_total[1h])) / clamp_min(sum(rate(app_events_processed_total[1h])), 1))", "refId": "A"}],
+      "title": "Processing Success Rate",
+      "type": "stat"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}, "id": 101, "title": "Activity by Country", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "stacking": {"mode": "normal"}}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "id": 5,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(increase(app_events_published_total[5m])) by (country)", "legendFormat": "{{country}}", "refId": "A"}
+      ],
+      "title": "Employee Events by Country",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "stacking": {"mode": "normal"}}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(increase(app_events_published_total[5m])) by (event_type, country)", "legendFormat": "{{event_type}} ({{country}})", "refId": "A"}
+      ],
+      "title": "Event Types by Country",
+      "type": "timeseries"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}, "id": 102, "title": "API Usage Patterns", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15},
+      "id": 7,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(rate(app_http_requests_total{job=\"hr-service\"}[5m])) by (method)", "legendFormat": "HR {{method}}", "refId": "A"},
+        {"expr": "sum(rate(app_http_requests_total{job=\"hub-service\"}[5m])) by (method)", "legendFormat": "Hub {{method}}", "refId": "B"}
+      ],
+      "title": "API Requests by Method",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15},
+      "id": 8,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "topk(5, sum(rate(app_http_requests_total[5m])) by (endpoint))", "legendFormat": "{{endpoint}}", "refId": "A"}
+      ],
+      "title": "Top 5 Endpoints by Traffic",
+      "type": "timeseries"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23}, "id": 103, "title": "Event Pipeline Reliability", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10}, "unit": "ops"}, "overrides": [
+        {"matcher": {"id": "byName", "options": "Published"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]},
+        {"matcher": {"id": "byName", "options": "Processed"}, "properties": [{"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}}]},
+        {"matcher": {"id": "byName", "options": "Errors"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]}
+      ]},
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 24},
+      "id": 9,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(rate(app_events_published_total[5m]))", "legendFormat": "Published", "refId": "A"},
+        {"expr": "sum(rate(app_events_processed_total[5m]))", "legendFormat": "Processed", "refId": "B"},
+        {"expr": "sum(rate(app_event_processing_errors_total[5m]))", "legendFormat": "Errors", "refId": "C"}
+      ],
+      "title": "Event Flow — Published vs Processed vs Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "min": 0, "max": 100, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 90}, {"color": "green", "value": 99}]}, "unit": "percent", "decimals": 2}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24},
+      "id": 10,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [{"expr": "(sum(rate(app_events_processed_total[1h])) / clamp_min(sum(rate(app_events_published_total[1h])), 0.001)) * 100", "refId": "A"}],
+      "title": "Event Delivery Rate",
+      "type": "gauge"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["hr-platform", "business"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "refresh": "30s",
+  "title": "Business Metrics",
+  "uid": "business-metrics",
+  "version": 1
+}

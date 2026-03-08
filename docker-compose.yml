@@ -1,0 +1,308 @@
+services:
+  # ─────────────── HR Service ───────────────
+  hr-service:
+    build:
+      context: ./hr-service
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "${HR_PORT:-8001}:80"
+    volumes:
+      - ./contracts:/var/contracts:ro
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:placeholder_key_replace_on_first_run==
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8001
+      DB_CONNECTION: pgsql
+      DB_HOST: hr-postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HR_DB_NAME:-hr_service}
+      DB_USERNAME: ${HR_DB_USER:-postgres}
+      DB_PASSWORD: ${HR_DB_PASS:-secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBITMQ_VHOST: /
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: debug
+    depends_on:
+      hr-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - platform
+
+  # ─────────────── Hub Service ───────────────
+  hub-service:
+    build:
+      context: ./hub-service
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "${HUB_PORT:-8002}:80"
+    volumes:
+      - ./contracts:/var/contracts:ro
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:placeholder_key_replace_on_first_run==
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8002
+      DB_CONNECTION: pgsql
+      DB_HOST: hub-postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HUB_DB_NAME:-hub_service}
+      DB_USERNAME: ${HUB_DB_USER:-postgres}
+      DB_PASSWORD: ${HUB_DB_PASS:-secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBITMQ_VHOST: /
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      CACHE_STORE: redis
+      REVERB_APP_ID: ${REVERB_APP_ID:-1}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-hr-platform-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-hr-platform-secret}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      BROADCAST_CONNECTION: reverb
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: debug
+    depends_on:
+      hub-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - platform
+
+  # ─────────────── Hub Consumer ───────────────
+  hub-consumer:
+    build:
+      context: ./hub-service
+      dockerfile: Dockerfile
+      target: dev
+    command: ["php", "artisan", "rabbitmq:consume", "--prefetch=1"]
+    stop_grace_period: 30s
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:placeholder_key_replace_on_first_run==
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: hub-postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HUB_DB_NAME:-hub_service}
+      DB_USERNAME: ${HUB_DB_USER:-postgres}
+      DB_PASSWORD: ${HUB_DB_PASS:-secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RABBITMQ_VHOST: /
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      CACHE_STORE: redis
+      REVERB_APP_ID: ${REVERB_APP_ID:-1}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-hr-platform-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-hr-platform-secret}
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+      BROADCAST_CONNECTION: reverb
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: debug
+    depends_on:
+      hub-service:
+        condition: service_healthy
+    networks:
+      - platform
+
+  # ─────────────── Reverb WebSocket ───────────────
+  reverb:
+    build:
+      context: ./hub-service
+      dockerfile: Dockerfile
+      target: dev
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080", "--no-interaction"]
+    ports:
+      - "${WS_PORT:-8080}:8080"
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:placeholder_key_replace_on_first_run==
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: hub-postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${HUB_DB_NAME:-hub_service}
+      DB_USERNAME: ${HUB_DB_USER:-postgres}
+      DB_PASSWORD: ${HUB_DB_PASS:-secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REVERB_APP_ID: ${REVERB_APP_ID:-1}
+      REVERB_APP_KEY: ${REVERB_APP_KEY:-hr-platform-key}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET:-hr-platform-secret}
+      REVERB_HOST: 0.0.0.0
+      REVERB_PORT: 8080
+      BROADCAST_CONNECTION: reverb
+      LOG_CHANNEL: stderr
+    depends_on:
+      hub-service:
+        condition: service_healthy
+    networks:
+      - platform
+
+  # ─────────────── HR PostgreSQL ───────────────
+  hr-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${HR_DB_NAME:-hr_service}
+      POSTGRES_USER: ${HR_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${HR_DB_PASS:-secret}
+    volumes:
+      - hr-postgres-data:/var/lib/postgresql/data
+      - ./hr-service/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HR_DB_USER:-postgres} -d ${HR_DB_NAME:-hr_service}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - platform
+
+  # ─────────────── Hub PostgreSQL ───────────────
+  hub-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${HUB_DB_NAME:-hub_service}
+      POSTGRES_USER: ${HUB_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${HUB_DB_PASS:-secret}
+    volumes:
+      - hub-postgres-data:/var/lib/postgresql/data
+      - ./hub-service/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HUB_DB_USER:-postgres} -d ${HUB_DB_NAME:-hub_service}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - platform
+
+  # ─────────────── RabbitMQ ───────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "${AMQP_PORT:-5672}:5672"
+      - "${AMQP_MGMT_PORT:-15672}:15672"
+      - "${AMQP_METRICS_PORT:-15692}:15692"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - platform
+
+  # ─────────────── Redis ───────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - platform
+
+  # ─────────────── Prometheus ───────────────
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "${PROM_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - platform
+
+  # ─────────────── Grafana ───────────────
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      - prometheus
+    networks:
+      - platform
+
+networks:
+  platform:
+    driver: bridge
+
+volumes:
+  hr-postgres-data:
+  hub-postgres-data:
+  rabbitmq-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

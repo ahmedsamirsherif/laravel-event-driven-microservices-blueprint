@@ -1,0 +1,22 @@
+groups:
+  - name: hr-service
+    rules:
+      - alert: HRServiceDown
+        expr: up{job="hr-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HR Service is down"
+          description: "HR Service has been unreachable for more than 1 minute."
+
+      - alert: HRServiceHighErrorRate
+        expr: |
+          (sum(rate(app_http_requests_total{service="hr-service",status=~"5.."}[5m]))
+           / sum(rate(app_http_requests_total{service="hr-service"}[5m]))) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HR Service high error rate"
+          description: "HR Service error rate is above 5% for 2 minutes."

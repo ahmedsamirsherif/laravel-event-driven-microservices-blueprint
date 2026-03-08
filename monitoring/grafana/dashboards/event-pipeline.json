@@ -1,0 +1,183 @@
+{
+  "annotations": {"list": []},
+  "description": "Complete event flow monitoring — HR publishes → RabbitMQ → Hub consumes, with processing speed, errors, and queue health",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 100, "title": "Event Pipeline Overview", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 1},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_events_published_total[1h]))", "refId": "A"}],
+      "title": "Events Published (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 1},
+      "id": 2,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_events_processed_total[1h]))", "refId": "A"}],
+      "title": "Events Processed (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 1},
+      "id": 3,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "sum(increase(app_event_processing_errors_total[1h]))", "refId": "A"}],
+      "title": "Processing Errors (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.1}, {"color": "red", "value": 0.5}]}, "unit": "s", "decimals": 3}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 1},
+      "id": 4,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "area"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(app_event_processing_duration_seconds_bucket[5m])) by (le))", "refId": "A"}],
+      "title": "P95 Processing Time",
+      "type": "stat"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 6}, "id": 101, "title": "Event Flow", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10}, "unit": "ops"}, "overrides": [
+        {"matcher": {"id": "byName", "options": "Published"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]},
+        {"matcher": {"id": "byName", "options": "Processed"}, "properties": [{"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}}]}
+      ]},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 7},
+      "id": 5,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(rate(app_events_published_total[5m]))", "legendFormat": "Published", "refId": "A"},
+        {"expr": "sum(rate(app_events_processed_total[5m]))", "legendFormat": "Processed", "refId": "B"}
+      ],
+      "title": "Published vs Processed Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "stacking": {"mode": "normal"}}, "unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 7},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "sum(rate(app_events_published_total[5m])) by (event_type)", "legendFormat": "{{event_type}}", "refId": "A"}],
+      "title": "Events by Type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "stacking": {"mode": "normal"}}, "unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15},
+      "id": 7,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "sum(rate(app_events_published_total[5m])) by (country)", "legendFormat": "{{country}}", "refId": "A"}],
+      "title": "Events by Country",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10}, "unit": "ops", "color": {"fixedColor": "red", "mode": "fixed"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15},
+      "id": 8,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [{"expr": "sum(rate(app_event_processing_errors_total[5m])) by (event_type)", "legendFormat": "Errors: {{event_type}}", "refId": "A"}],
+      "title": "Processing Error Rate",
+      "type": "timeseries"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23}, "id": 102, "title": "Processing Speed", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+      "id": 9,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(app_event_processing_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum(rate(app_event_processing_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum(rate(app_event_processing_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99", "refId": "C"}
+      ],
+      "title": "Event Processing Duration — P50 / P95 / P99",
+      "type": "timeseries"
+    },
+
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 32}, "id": 103, "title": "RabbitMQ Queue Health", "type": "row"},
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 20}, "unit": "short"}, "overrides": [
+        {"matcher": {"id": "byName", "options": "Ready"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]},
+        {"matcher": {"id": "byName", "options": "Unacked"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]},
+        {"matcher": {"id": "byName", "options": "Total"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]}
+      ]},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 33},
+      "id": 10,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(rabbitmq_queue_messages_ready)", "legendFormat": "Ready", "refId": "A"},
+        {"expr": "sum(rabbitmq_queue_messages_unacked)", "legendFormat": "Unacked", "refId": "B"},
+        {"expr": "sum(rabbitmq_queue_messages)", "legendFormat": "Total", "refId": "C"}
+      ],
+      "title": "Queue Depth",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 33},
+      "id": 11,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "sum(rate(rabbitmq_global_messages_received_total[5m]))", "legendFormat": "Received", "refId": "A"},
+        {"expr": "sum(rate(rabbitmq_global_messages_delivered_total[5m]))", "legendFormat": "Delivered", "refId": "B"},
+        {"expr": "sum(rate(rabbitmq_global_messages_acknowledged_total[5m]))", "legendFormat": "Acknowledged", "refId": "C"}
+      ],
+      "title": "RabbitMQ Message Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 41},
+      "id": 12,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "rabbitmq_connections", "legendFormat": "Connections", "refId": "A"},
+        {"expr": "rabbitmq_channels", "legendFormat": "Channels", "refId": "B"},
+        {"expr": "rabbitmq_consumers", "legendFormat": "Consumers", "refId": "C"}
+      ],
+      "title": "RabbitMQ Connections & Channels",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 20}, "unit": "short", "color": {"fixedColor": "dark-red", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 41},
+      "id": 13,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {"expr": "sum(rate(rabbitmq_global_messages_dead_lettered_confirmed_total[5m]))", "legendFormat": "Dead Lettered Rate", "refId": "A"},
+        {"expr": "sum(rate(rabbitmq_global_messages_unroutable_dropped_total[5m]))", "legendFormat": "Unroutable Dropped Rate", "refId": "B"}
+      ],
+      "title": "Dead Letter & Unroutable Messages",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["hr-platform", "events", "pipeline"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "10s",
+  "title": "Event Pipeline Monitor",
+  "uid": "event-pipeline",
+  "version": 1
+}

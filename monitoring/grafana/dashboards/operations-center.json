@@ -1,0 +1,427 @@
+{
+  "uid": "operations-center",
+  "title": "Operations Center",
+  "description": "Unified monitoring: RPS, WebSocket broadcasts, checklist calls, Redis cache, event flow, slowest events, and bottleneck analysis",
+  "tags": ["operations", "unified", "hr", "hub"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "editable": true,
+  "panels": [
+    {
+      "id": 100,
+      "title": "Requests / Second",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "title": "HR Service — Requests/sec",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 100}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "auto" },
+      "targets": [{ "expr": "sum(rate(app_http_requests_total{job=\"hr-service\"}[1m]))", "legendFormat": "HR RPS" }]
+    },
+    {
+      "id": 2,
+      "title": "Hub Service — Requests/sec",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 100}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "auto" },
+      "targets": [{ "expr": "sum(rate(app_http_requests_total{job=\"hub-service\"}[1m]))", "legendFormat": "Hub RPS" }]
+    },
+    {
+      "id": 3,
+      "title": "RPS by Endpoint",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 8, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 } } },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
+      "targets": [
+        { "expr": "sum by (endpoint) (rate(app_http_requests_total{job=\"hr-service\"}[1m]))", "legendFormat": "HR {{endpoint}}" },
+        { "expr": "sum by (endpoint) (rate(app_http_requests_total{job=\"hub-service\"}[1m]))", "legendFormat": "Hub {{endpoint}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Error Rate %",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}] } }
+      },
+      "targets": [{ "expr": "100 * sum(rate(app_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(app_http_requests_total[5m]))", "legendFormat": "Error %" }]
+    },
+    {
+      "id": 5,
+      "title": "P95 Latency (ms)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 200}, {"color": "red", "value": 1000}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(app_http_request_duration_seconds_bucket[5m])))", "legendFormat": "P95" }]
+    },
+    {
+      "id": 6,
+      "title": "Checklist Requests/sec",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 5 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 1}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "sum(rate(app_http_requests_total{job=\"hub-service\", endpoint=~\".*/checklist/.*\"}[1m]))", "legendFormat": "Checklist RPS" }]
+    },
+    {
+      "id": 7,
+      "title": "Employees API Requests/sec",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 5 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 1}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "sum(rate(app_http_requests_total{endpoint=~\".*/employees.*\"}[1m]))", "legendFormat": "Employees RPS" }]
+    },
+
+    {
+      "id": 200,
+      "title": "Event Flow & Pipeline",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "title": "Events Published (HR) vs Processed (Hub)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Published" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Processed" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Errors" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum", "lastNotNull"] } },
+      "targets": [
+        { "expr": "sum(increase(app_events_published_total[5m]))", "legendFormat": "Published" },
+        { "expr": "sum(increase(app_events_processed_total[5m]))", "legendFormat": "Processed" },
+        { "expr": "sum(increase(app_event_processing_errors_total[5m]))", "legendFormat": "Errors" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Events by Type (Rate)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "sum by (event_type) (rate(app_events_processed_total[5m]))", "legendFormat": "{{event_type}}" }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Event Publish Duration (HR)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 200}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(app_event_publish_duration_seconds_bucket{job=\"hr-service\"}[5m])))", "legendFormat": "P95 publish" }]
+    },
+    {
+      "id": 13,
+      "title": "Event Retries / DLQ",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 10 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [
+        { "expr": "sum(increase(app_event_retries_total[1h])) or vector(0)", "legendFormat": "Retries" },
+        { "expr": "sum(increase(app_event_dlq_routed_total[1h])) or vector(0)", "legendFormat": "DLQ" }
+      ]
+    },
+
+    {
+      "id": 300,
+      "title": "Slowest Events & Bottleneck Analysis",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "title": "Event Processing Duration by Type (P95)",
+      "description": "Identifies the SLOWEST event type. Higher bars = bottleneck.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "pointSize": 5, "showPoints": "always" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (event_type, le) (rate(app_event_processing_duration_seconds_bucket[5m])))", "legendFormat": "{{event_type}}" }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Avg Processing Time per Event Type",
+      "description": "Average time to process each event type end-to-end",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0, "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.1}, {"color": "orange", "value": 0.5}, {"color": "red", "value": 1}] } }
+      },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true },
+      "targets": [
+        { "expr": "sum by (event_type) (rate(app_event_processing_duration_seconds_sum[5m])) / sum by (event_type) (rate(app_event_processing_duration_seconds_count[5m]))", "legendFormat": "{{event_type}}" }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "End-to-End Latency Breakdown",
+      "description": "Publish time (HR) + Processing time (Hub) = total pipeline latency. Shows where bottlenecks are.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 30, "lineWidth": 2, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "HR Publish" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Hub Processing" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(app_event_publish_duration_seconds_bucket{job=\"hr-service\"}[5m])))", "legendFormat": "HR Publish" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(app_event_processing_duration_seconds_bucket{job=\"hub-service\"}[5m])))", "legendFormat": "Hub Processing" }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "Request Latency by Endpoint (P95)",
+      "description": "Slowest API endpoints — identifies HTTP-level bottlenecks",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.1}, {"color": "red", "value": 0.5}] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "endpoint" }, "properties": [{ "id": "custom.width", "value": 250 }] },
+          { "matcher": { "id": "byName", "options": "job" }, "properties": [{ "id": "custom.width", "value": 120 }] }
+        ]
+      },
+      "options": { "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Value" }] },
+      "transformations": [
+        { "id": "labelsToFields", "options": {} },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true, "__name__": true } } }
+      ],
+      "targets": [
+        { "expr": "topk(10, histogram_quantile(0.95, sum by (job, endpoint, le) (rate(app_http_request_duration_seconds_bucket[5m]))))", "legendFormat": "{{job}} {{endpoint}}", "format": "table", "instant": true }
+      ]
+    },
+
+    {
+      "id": 400,
+      "title": "WebSocket Broadcasts",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "title": "WebSocket Broadcasts / min",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 36 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "purple", "value": null}, {"color": "green", "value": 1}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "sum(rate(app_websocket_broadcasts_total[1m])) * 60", "legendFormat": "Broadcasts/min" }]
+    },
+    {
+      "id": 31,
+      "title": "Total Broadcasts",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 36 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "blue", "value": null}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [{ "expr": "sum(app_websocket_broadcasts_total) or vector(0)", "legendFormat": "Total" }]
+    },
+    {
+      "id": 32,
+      "title": "Broadcast Failures",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 36 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [{ "expr": "sum(app_websocket_broadcast_failures_total) or vector(0)", "legendFormat": "Failures" }]
+    },
+    {
+      "id": 33,
+      "title": "Broadcasts by Event Type",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "sum by (event_type) (increase(app_websocket_broadcasts_total[5m]))", "legendFormat": "{{event_type}}" }
+      ]
+    },
+
+    {
+      "id": 500,
+      "title": "Redis Cache Performance",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "collapsed": false
+    },
+    {
+      "id": 40,
+      "title": "Cache Hit Rate %",
+      "type": "gauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 42 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 50}, {"color": "green", "value": 80}] } }
+      },
+      "targets": [{ "expr": "100 * sum(rate(app_cache_hits_total[5m])) / (sum(rate(app_cache_hits_total[5m])) + sum(rate(app_cache_misses_total[5m])))", "legendFormat": "Hit Rate" }]
+    },
+    {
+      "id": 41,
+      "title": "Cache Hits vs Misses",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 42 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "Hits.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "Misses.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] } },
+      "targets": [
+        { "expr": "sum by (cache_type) (increase(app_cache_hits_total[5m]))", "legendFormat": "Hits ({{cache_type}})" },
+        { "expr": "sum by (cache_type) (increase(app_cache_misses_total[5m]))", "legendFormat": "Misses ({{cache_type}})" }
+      ]
+    },
+    {
+      "id": 42,
+      "title": "Cache by Type",
+      "description": "Hit rates broken down: employee_list, checklist, avg_salary",
+      "type": "bargauge",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 42 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 50}, {"color": "green", "value": 80}] } }
+      },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true },
+      "targets": [
+        { "expr": "100 * sum by (cache_type) (rate(app_cache_hits_total[5m])) / (sum by (cache_type) (rate(app_cache_hits_total[5m])) + sum by (cache_type) (rate(app_cache_misses_total[5m])))", "legendFormat": "{{cache_type}}" }
+      ]
+    },
+
+    {
+      "id": 600,
+      "title": "RabbitMQ Queue Health",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "collapsed": false
+    },
+    {
+      "id": 50,
+      "title": "Queue Depth",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 49 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 100}, {"color": "red", "value": 1000}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" },
+      "targets": [{ "expr": "rabbitmq_queue_messages{queue=\"hub_employee_events\"}", "legendFormat": "Messages" }]
+    },
+    {
+      "id": 51,
+      "title": "Messages Ready vs Unacked",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 8, "x": 4, "y": 49 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 20 } } },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rabbitmq_queue_messages_ready{queue=\"hub_employee_events\"}", "legendFormat": "Ready" },
+        { "expr": "rabbitmq_queue_messages_unacked{queue=\"hub_employee_events\"}", "legendFormat": "Unacked" }
+      ]
+    },
+    {
+      "id": 52,
+      "title": "DLQ Messages",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 49 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}] } }
+      },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [{ "expr": "rabbitmq_queue_messages{queue=\"hub_employee_events_dlq\"}", "legendFormat": "DLQ" }]
+    },
+    {
+      "id": 53,
+      "title": "Message Publish & Consume Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 49 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Published" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Consumed" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "sum(rate(rabbitmq_queue_messages_published_total{queue=\"hub_employee_events\"}[1m]))", "legendFormat": "Published" },
+        { "expr": "sum(rate(rabbitmq_queue_messages_delivered_total{queue=\"hub_employee_events\"}[1m]))", "legendFormat": "Consumed" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

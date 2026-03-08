@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HR Platform — Real-Time WebSocket Test</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+        h1 { margin-bottom: 8px; }
+        .subtitle { color: #666; margin-bottom: 20px; font-size: 0.9em; }
+        #events { border: 1px solid #ddd; padding: 16px; height: 450px; overflow-y: auto; background: #fafafa; border-radius: 6px; }
+        .event { margin-bottom: 8px; padding: 10px 12px; border-left: 4px solid #007bff; background: white; border-radius: 0 4px 4px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .event.created { border-color: #28a745; }
+        .event.updated { border-color: #fd7e14; }
+        .event.deleted { border-color: #dc3545; }
+        .event.checklist { border-color: #6f42c1; }
+        .event.info { border-color: #17a2b8; }
+        .event pre { margin: 6px 0 0; font-size: 0.8em; max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 8px; border-radius: 4px; }
+        .event-header { display: flex; justify-content: space-between; align-items: center; }
+        .event-badge { font-size: 0.75em; padding: 2px 8px; border-radius: 10px; color: white; font-weight: 600; }
+        .event-badge.created { background: #28a745; }
+        .event-badge.updated { background: #fd7e14; }
+        .event-badge.deleted { background: #dc3545; }
+        .event-badge.info { background: #17a2b8; }
+        .checklist-bar { background: #e9ecef; border-radius: 4px; height: 8px; margin-top: 4px; }
+        .checklist-bar-fill { height: 100%; border-radius: 4px; background: #28a745; transition: width 0.3s; }
+        .status { padding: 10px 14px; margin-bottom: 16px; border-radius: 6px; font-weight: 500; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+        .controls select, .controls button { padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; }
+        .controls button { cursor: pointer; background: #007bff; color: white; border-color: #007bff; }
+        .controls button:hover { background: #0056b3; }
+        .controls button.secondary { background: #6c757d; border-color: #6c757d; }
+        .controls button.danger { background: #dc3545; border-color: #dc3545; }
+        .stats { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .stat { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 10px 16px; min-width: 100px; text-align: center; }
+        .stat .number { font-size: 1.5em; font-weight: 700; }
+        .stat .label { font-size: 0.8em; color: #666; }
+        .stat.created .number { color: #28a745; }
+        .stat.updated .number { color: #fd7e14; }
+        .stat.deleted .number { color: #dc3545; }
+        .stat.total .number { color: #007bff; }
+        .channels-list { font-size: 0.85em; color: #555; margin-top: 4px; }
+        details { margin-top: 4px; }
+        details summary { cursor: pointer; font-size: 0.85em; color: #007bff; }
+    </style>
+</head>
+<body>
+    <h1>HR Platform Real-Time Events</h1>
+    <p class="subtitle">WebSocket monitor — subscribe to channels and watch live employee lifecycle events</p>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="controls">
+        <select id="channel">
+            <option value="employees">employees (all events)</option>
+            <option value="country.USA">country.USA</option>
+            <option value="country.DEU">country.DEU</option>
+            <option value="checklist.USA">checklist.USA</option>
+            <option value="checklist.DEU">checklist.DEU</option>
+        </select>
+        <button onclick="subscribeChannel()">Subscribe</button>
+        <button onclick="connectAll()" class="secondary">Subscribe All</button>
+        <button onclick="disconnect()" class="secondary">Disconnect</button>
+        <button onclick="clearEvents()" class="danger">Clear</button>
+        <label style="font-size:0.85em"><input type="checkbox" id="autoScroll" checked> Auto-scroll</label>
+        <label style="font-size:0.85em"><input type="checkbox" id="compactMode"> Compact</label>
+    </div>
+
+    <div class="stats">
+        <div class="stat total"><div class="number" id="stat-total">0</div><div class="label">Total</div></div>
+        <div class="stat created"><div class="number" id="stat-created">0</div><div class="label">Created</div></div>
+        <div class="stat updated"><div class="number" id="stat-updated">0</div><div class="label">Updated</div></div>
+        <div class="stat deleted"><div class="number" id="stat-deleted">0</div><div class="label">Deleted</div></div>
+        <div class="stat"><div class="number" id="stat-latency">—</div><div class="label">Avg Latency</div></div>
+    </div>
+
+    <div id="subscribed-channels" class="channels-list"></div>
+    <br>
+    <div id="events"><em>Waiting for events... Click "Subscribe" or "Subscribe All" to start.</em></div>
+
+    <script>
+        let ws = null;
+        const subscribedChannels = new Set();
+        const stats = { total: 0, created: 0, updated: 0, deleted: 0, latencies: [] };
+
+        const REVERB_HOST = window.location.hostname;
+        const REVERB_PORT = 8080;
+        const REVERB_APP_KEY = 'hr-platform-key';
+
+        function ensureConnected() {
+            return new Promise((resolve) => {
+                if (ws && ws.readyState === WebSocket.OPEN) { resolve(); return; }
+                const wsUrl = `ws://${REVERB_HOST}:${REVERB_PORT}/app/${REVERB_APP_KEY}?protocol=7&client=js&version=8.0.0&flash=false`;
+                ws = new WebSocket(wsUrl);
+                ws.onopen = () => { setStatus(true); resolve(); };
+                ws.onmessage = handleMessage;
+                ws.onclose = () => { setStatus(false); ws = null; };
+                ws.onerror = (e) => console.error('WS error', e);
+            });
+        }
+
+        function handleMessage(e) {
+            const data = JSON.parse(e.data);
+            if (data.event === 'pusher:connection_established') return;
+            if (data.event === 'pusher_internal:subscription_succeeded') {
+                addEvent({ _info: `Subscribed to: ${data.channel}` }, 'info', data.channel);
+                return;
+            }
+            try {
+                const payload = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+                const eventType = payload.event_type || 'unknown';
+                trackStats(eventType, payload);
+                addEvent(payload, eventType, data.channel);
+            } catch(err) {
+                addEvent(data, 'raw', data.channel);
+            }
+        }
+
+        async function subscribeChannel() {
+            const channel = document.getElementById('channel').value;
+            await ensureConnected();
+            if (subscribedChannels.has(channel)) return;
+            ws.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel } }));
+            subscribedChannels.add(channel);
+            updateChannelsList();
+        }
+
+        async function connectAll() {
+            await ensureConnected();
+            const allChannels = ['employees', 'country.USA', 'country.DEU', 'checklist.USA', 'checklist.DEU'];
+            for (const ch of allChannels) {
+                if (!subscribedChannels.has(ch)) {
+                    ws.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: ch } }));
+                    subscribedChannels.add(ch);
+                }
+            }
+            updateChannelsList();
+        }
+
+        function disconnect() {
+            if (ws) { ws.close(); ws = null; }
+            subscribedChannels.clear();
+            updateChannelsList();
+        }
+
+        function setStatus(connected) {
+            const el = document.getElementById('status');
+            el.className = 'status ' + (connected ? 'connected' : 'disconnected');
+            el.textContent = connected
+                ? `Connected to ws://${REVERB_HOST}:${REVERB_PORT}`
+                : 'Disconnected';
+        }
+
+        function updateChannelsList() {
+            const el = document.getElementById('subscribed-channels');
+            if (subscribedChannels.size === 0) { el.textContent = ''; return; }
+            el.textContent = 'Subscribed: ' + [...subscribedChannels].join(', ');
+        }
+
+        function trackStats(eventType, payload) {
+            stats.total++;
+            const key = eventType.replace('Employee', '').toLowerCase();
+            if (stats[key] !== undefined) stats[key]++;
+            if (payload.timestamp) {
+                const serverTime = new Date(payload.timestamp).getTime();
+                const latencyMs = Date.now() - serverTime;
+                if (latencyMs > 0 && latencyMs < 60000) stats.latencies.push(latencyMs);
+            }
+            document.getElementById('stat-total').textContent = stats.total;
+            document.getElementById('stat-created').textContent = stats.created;
+            document.getElementById('stat-updated').textContent = stats.updated;
+            document.getElementById('stat-deleted').textContent = stats.deleted;
+            if (stats.latencies.length > 0) {
+                const avg = Math.round(stats.latencies.reduce((a, b) => a + b, 0) / stats.latencies.length);
+                document.getElementById('stat-latency').textContent = avg + 'ms';
+            }
+        }
+
+        function addEvent(data, type, channel) {
+            const container = document.getElementById('events');
+            if (stats.total <= 1 && container.querySelector('em')) container.innerHTML = '';
+
+            const div = document.createElement('div');
+            const typeClass = (type || '').toLowerCase().replace('employee', '').toLowerCase();
+            div.className = `event ${typeClass}`;
+            div.setAttribute('data-event-type', type);
+            div.setAttribute('data-channel', channel || '');
+
+            const compact = document.getElementById('compactMode').checked;
+
+            let extra = '';
+            if (data.checklist_completion) {
+                const cl = data.checklist_completion;
+                const pct = cl.completion_percentage ?? 0;
+                extra = `<div style="margin-top:6px"><strong>Checklist:</strong> ${pct}% complete
+                    <div class="checklist-bar"><div class="checklist-bar-fill" style="width:${pct}%"></div></div></div>`;
+            }
+
+            const time = new Date().toLocaleTimeString();
+            const chLabel = channel ? ` <span style="color:#888;font-size:0.85em">[${channel}]</span>` : '';
+            const empInfo = data.employee_id ? ` #${data.employee_id}` : '';
+            const badge = `<span class="event-badge ${typeClass}">${type}${empInfo}</span>`;
+
+            if (compact) {
+                div.innerHTML = `<div class="event-header"><span>${time}${chLabel}</span>${badge}</div>${extra}`;
+            } else {
+                div.innerHTML = `<div class="event-header"><span>${time}${chLabel}</span>${badge}</div>${extra}
+                    <details><summary>Payload</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            }
+
+            container.prepend(div);
+
+            // Keep max 500 events to prevent memory issues
+            while (container.children.length > 500) container.removeChild(container.lastChild);
+
+            if (document.getElementById('autoScroll').checked) container.scrollTop = 0;
+        }
+
+        function clearEvents() {
+            document.getElementById('events').innerHTML = '<em>Waiting for events...</em>';
+            stats.total = 0; stats.created = 0; stats.updated = 0; stats.deleted = 0; stats.latencies = [];
+            document.getElementById('stat-total').textContent = '0';
+            document.getElementById('stat-created').textContent = '0';
+            document.getElementById('stat-updated').textContent = '0';
+            document.getElementById('stat-deleted').textContent = '0';
+            document.getElementById('stat-latency').textContent = '—';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+groups:
+  - name: hub-service
+    rules:
+      - alert: HubServiceDown
+        expr: up{job="hub-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Hub Service is down"
+          description: "Hub Service has been unreachable for more than 1 minute."
+
+      - alert: EventProcessingErrorsHigh
+        expr: sum(increase(app_event_processing_errors_total[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hub Service event processing errors elevated"
+          description: "More than 10 event processing errors in 5 minutes."
