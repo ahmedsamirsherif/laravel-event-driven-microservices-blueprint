@@ -12,7 +12,7 @@
 
   /* ── Panel content loading ─────────────────────────── */
   const loadedPanels = new Set();
-  const docsVersion = '11';
+  const docsVersion = '12';
 
   function sanitizePanelHtml(html) {
     return html.replace(/<!-- Code injected by live-server -->[\s\S]*?<\/script>/gi, '');
@@ -60,7 +60,24 @@
   const mermaidSources = new Map();
   const renderedPanels = new Set();
 
+  function hasMermaid() {
+    return typeof window.mermaid !== 'undefined';
+  }
+
+  function applyMermaidFallback(panel) {
+    if (!panel) return;
+    panel.querySelectorAll('pre.mermaid').forEach(block => {
+      if (!mermaidSources.has(block)) {
+        mermaidSources.set(block, block.textContent.trim());
+      }
+      block.textContent = mermaidSources.get(block);
+      block.classList.add('mermaid-fallback');
+      block.removeAttribute('data-processed');
+    });
+  }
+
   function initMermaid(theme) {
+    if (!hasMermaid()) return false;
     mermaid.initialize({
       startOnLoad: false,
       theme: theme === 'dark' ? 'dark' : 'default',
@@ -68,6 +85,7 @@
       flowchart: { useMaxWidth: true, htmlLabels: true },
       sequence:  { useMaxWidth: true }
     });
+    return true;
   }
 
   /* ── Diagram zoom modal ────────────────────────────── */
@@ -153,21 +171,20 @@
       freshPre.textContent = source;
       content.appendChild(freshPre);
 
-      /* Open first so mermaid can measure the container, then render */
       diagramModal.classList.add('open');
       document.body.style.overflow = 'hidden';
 
-      /* Re-init with current theme to pick up any changes, then render */
       const theme = document.documentElement.getAttribute('data-theme');
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: theme === 'dark' ? 'dark' : 'default',
-        maxTextSize: 100000,
-        flowchart: { useMaxWidth: true, htmlLabels: true },
-        sequence:  { useMaxWidth: true }
-      });
-      Promise.resolve(mermaid.run({ nodes: [freshPre] }))
-        .then(() => scheduleDiagramFit());
+      if (!initMermaid(theme)) {
+        freshPre.classList.add('mermaid-fallback');
+      } else {
+        Promise.resolve(mermaid.run({ nodes: [freshPre] }))
+          .then(() => scheduleDiagramFit())
+          .catch(err => {
+            console.error('Failed to render Mermaid diagram in modal:', err);
+            freshPre.classList.add('mermaid-fallback');
+          });
+      }
     } else {
       diagramModal.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -312,6 +329,11 @@
     const blocks = panel.querySelectorAll('pre.mermaid');
     if (!blocks.length) return;
 
+    if (!hasMermaid()) {
+      applyMermaidFallback(panel);
+      return;
+    }
+
     blocks.forEach(block => {
       /* Save original source on first encounter */
       if (!mermaidSources.has(block)) {
@@ -319,12 +341,18 @@
       }
       /* Restore source for re-render */
       block.textContent = mermaidSources.get(block);
+      block.classList.remove('mermaid-fallback');
       block.removeAttribute('data-processed');
     });
 
     /* Let Mermaid re-render, then inject zoom buttons */
     const p = mermaid.run({ nodes: blocks });
-    Promise.resolve(p).then(() => injectDiagramZoomButtons(panel));
+    Promise.resolve(p)
+      .then(() => injectDiagramZoomButtons(panel))
+      .catch(err => {
+        console.error(`Failed to render Mermaid diagrams for panel "${panelId}":`, err);
+        applyMermaidFallback(panel);
+      });
     renderedPanels.add(panelId);
   }
 

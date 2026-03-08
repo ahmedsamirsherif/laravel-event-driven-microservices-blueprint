@@ -326,6 +326,13 @@ pre.mermaid{
   font-size:0;
 }
 pre.mermaid[data-processed="true"],pre.mermaid svg{font-size:initial}
+pre.mermaid.mermaid-fallback{
+  font-size:.84rem;
+  text-align:left;
+  white-space:pre-wrap;
+  font-family:var(--font-mono);
+  line-height:1.6;
+}
 
 /* ── Tables ──────────────────────────────────────────── */
 table{width:100%;border-collapse:collapse;margin-bottom:1.25rem;font-size:.88rem}
