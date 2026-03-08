@@ -1,29 +1,29 @@
 <h1>Performance &amp; Optimization</h1>
 
-  <p>The platform applies targeted optimizations at every layer: RabbitMQ connectivity, cache invalidation, indexing, event processing, Docker images, and observability. This page consolidates the performance-critical decisions that keep the write path predictable and the read path fast.</p>
+  <p>This page covers the choices that keep writes predictable and reads fast: messaging, caching, indexing, event processing, Docker, and observability.</p>
 
   <div class="card-grid">
-    <div class="card"><strong>Messaging</strong><span>Persistent publisher connections, long-lived consumers, durable topology, bounded retries</span></div>
-    <div class="card"><strong>Caching</strong><span>Version-based invalidation, per-employee checklist caching, eager rebuild, metrics-backed hit tracking</span></div>
-    <div class="card"><strong>Database</strong><span>Purpose-built indices, database-side aggregations, no full-table scans on normal read paths</span></div>
-    <div class="card"><strong>Runtime</strong><span>Optimized autoloading, opcache, multi-stage images, health-gated startup, in-memory metrics collection</span></div>
+    <div class="card"><strong>Messaging</strong><span>Reuse connections, keep consumers alive, durable topology, bounded retries</span></div>
+    <div class="card"><strong>Caching</strong><span>Versioned invalidation, per-employee checklist caching, eager rebuild, hit/miss metrics</span></div>
+    <div class="card"><strong>Database</strong><span>Indexes built for real query patterns, database-side aggregations, no full-table scans on normal reads</span></div>
+    <div class="card"><strong>Runtime</strong><span>Optimized autoloading, opcache, multi-stage images, health-gated startup, in-memory metrics</span></div>
   </div>
 
   <h2>RabbitMQ Connection Management</h2>
-  <p>The HR publisher keeps a <strong>persistent, lazy connection</strong> with connection health checks and transparent reconnection. It reuses the existing AMQP connection while it is alive and only opens a new connection after a failure. That avoids paying a TCP plus AMQP handshake on every publish while still recovering cleanly from broker restarts.</p>
+  <p>The HR publisher keeps one <strong>lazy connection</strong> around, reuses it while it is healthy, and reconnects only after a failure. That avoids paying the TCP and AMQP handshake cost on every publish while still recovering cleanly after broker restarts.</p>
 
-  <p>The Hub consumer opens a <strong>single long-lived connection</strong> for the entire lifetime of the <code>rabbitmq:consume</code> process. Exchange and queue declarations happen once at startup, not per message. The one-second <code>wait()</code> timeout lets the loop check the stop flag frequently enough for clean container shutdown without busy waiting.</p>
+  <p>The Hub consumer keeps a <strong>single long-lived connection</strong> for the lifetime of the <code>rabbitmq:consume</code> process. Exchange and queue declarations happen once at startup, not per message. The one-second <code>wait()</code> timeout lets the loop react to stop signals without busy waiting.</p>
 
   <div class="pattern-grid">
     <article class="pattern-card">
       <div class="pattern-card-head">
         <div class="pattern-card-title">
           <span class="pattern-badge">HR Service</span>
-          <h3>Publisher Connection Pattern</h3>
+          <h3>How the Publisher Stays Fast</h3>
         </div>
         <code class="pattern-entry">channel()</code>
       </div>
-      <p>The publisher keeps the hot path short: reuse the connection when healthy, reconnect only on failure, and keep topology declaration tied to connection lifecycle.</p>
+      <p>The publisher keeps the hot path short: use the live connection when it works, reconnect only on failure, and tie topology declaration to the connection lifecycle.</p>
       <div class="pattern-steps">
         <div class="pattern-step">
           <span class="pattern-step-index">1</span>
@@ -36,7 +36,7 @@
           <span class="pattern-step-index">2</span>
           <div class="pattern-step-body">
             <strong>Reconnect on failure</strong>
-            <span>If the connection is absent or dead, disconnect cleanly and create a fresh <code>AMQPStreamConnection</code>.</span>
+            <span>If the connection is missing or dead, disconnect cleanly and open a fresh <code>AMQPStreamConnection</code>.</span>
           </div>
         </div>
         <div class="pattern-step">
@@ -53,23 +53,23 @@
       <div class="pattern-card-head">
         <div class="pattern-card-title">
           <span class="pattern-badge">Hub Consumer</span>
-          <h3>Consumer Runtime Topology</h3>
+          <h3>How the Consumer Stays Steady</h3>
         </div>
         <code class="pattern-entry">consume()</code>
       </div>
-      <p>The consumer is optimized for steady-state throughput: one process, one connection, bounded in-flight work, and predictable shutdown behavior.</p>
+      <p>The consumer is tuned for steady throughput: one process, one connection, bounded in-flight work, and clean shutdown.</p>
       <div class="pattern-steps">
         <div class="pattern-step">
           <span class="pattern-step-index">1</span>
           <div class="pattern-step-body">
-            <strong>One connection for the full process lifetime</strong>
+            <strong>Keep one connection for the full process lifetime</strong>
             <span>The consumer keeps a single AMQP connection open instead of reconnecting per message.</span>
           </div>
         </div>
         <div class="pattern-step">
           <span class="pattern-step-index">2</span>
           <div class="pattern-step-body">
-            <strong>Bound concurrency with QoS</strong>
+            <strong>Limit in-flight work with QoS</strong>
             <span><code>basic_qos(prefetchCount=1)</code> limits the consumer to one unacked message at a time.</span>
           </div>
         </div>
@@ -83,8 +83,8 @@
         <div class="pattern-step">
           <span class="pattern-step-index">4</span>
           <div class="pattern-step-body">
-            <strong>Poll with a 1-second wait loop</strong>
-            <span><code>while(is_consuming &amp;&amp; !shouldStop) -&gt; wait(1s)</code> stays responsive to stop signals without busy waiting.</span>
+            <strong>Check for stop signals every second</strong>
+            <span><code>while(is_consuming &amp;&amp; !shouldStop) -&gt; wait(1s)</code> stays responsive without busy waiting.</span>
           </div>
         </div>
       </div>
@@ -125,9 +125,9 @@
     </div>
   </div>
 
-  <p>Checklist caching is more aggressive: each employee gets an individual key like <code>checklist:{country}:{employeeId}</code>. When an employee event lands, the specific employee checklist and the country summary are invalidated, and the consumer immediately re-warms the checklist inside the same event-handling cycle. That keeps the next checklist read as a cache hit.</p>
+  <p>Checklist caching is more targeted: each employee gets an individual key like <code>checklist:{country}:{employeeId}</code>. When an employee event lands, the specific checklist and the country summary are invalidated, and the consumer warms the checklist again in the same event cycle. That keeps the next checklist read as a cache hit.</p>
 
-  <p>When the checklist controller builds a paginated response, it reuses already cached per-employee checklist entries where possible. On a miss, it computes from the already-loaded model data rather than issuing extra reads. Prometheus hit and miss counters are incremented before cache resolution so effectiveness is measurable without changing caching behavior.</p>
+  <p>When the checklist controller builds a paginated response, it reuses cached per-employee checklist entries when possible. On a miss, it computes from already-loaded model data instead of issuing extra reads. Prometheus hit and miss counters are incremented before cache resolution so cache effectiveness stays measurable.</p>
 
   <h2>Database Indices</h2>
   <p>Every primary query path is backed by an index tailored to the actual access pattern.</p>
@@ -152,12 +152,12 @@
 
   <h2>DDD &amp; Architecture Optimizations</h2>
   <div class="callout">
-    <strong>Architectural optimization:</strong> domain logic is isolated from infrastructure so it cannot accidentally trigger I/O. Side effects only happen at the Application and Infrastructure boundaries.
+    <strong>Why the layering helps:</strong> domain logic stays away from infrastructure, so it cannot accidentally trigger I/O. Side effects only happen at the Application and Infrastructure edges.
   </div>
 
-  <p>Immutable DTOs and value objects use <code>final readonly</code> semantics, which allows safe pass-by-reference without defensive copying. Validation is front-loaded into constructors, making invalid states unrepresentable and reducing repeated validation cost later in the flow.</p>
+  <p>Immutable DTOs and value objects use <code>final readonly</code>, so they can move across the app safely without defensive copying. Constructors validate up front, which removes repeated checks later in the flow.</p>
 
-  <p>Country auto-discovery is convention based. Reflection runs once during application lifecycle to discover country modules, and resolved instances are cached. Combined with singleton registries, subsequent country lookups are O(1) map reads rather than repeated reflection or service registration work.</p>
+  <p>Country auto-discovery follows conventions. Reflection runs once during the application lifecycle to find country modules, and the resolved instances are cached. After that, country lookups are simple O(1) map reads.</p>
 
   <p>On the write side, partial repository updates send only changed fields to the database. On the read side, employee counts and average salary are pushed down into PostgreSQL with <code>COUNT(*)</code> and <code>AVG()</code> instead of hydrating result sets in PHP.</p>
 
@@ -182,15 +182,15 @@
   </table>
 
   <h2>Docker &amp; Infrastructure</h2>
-  <p>Multi-stage Dockerfiles reduce production image size by installing build tools only where needed and removing them after extension compilation. Composer dependencies are copied before application source so dependency layers stay cached when code changes.</p>
+  <p>Multi-stage Dockerfiles keep production images smaller by installing build tools only where they are needed and removing them afterward. Composer dependencies are copied before application source so dependency layers stay cached when code changes.</p>
 
-  <p>Alpine images keep the full stack lean, optimized Composer autoloading reduces filesystem lookups, and PHP opcache removes repeated source parsing. Redis AOF persistence balances durability with throughput, while health-gated startup in Docker Compose prevents services from racing databases or the broker during boot.</p>
+  <p>Alpine images keep the stack lean, optimized Composer autoloading reduces filesystem work, and PHP opcache removes repeated parsing. Redis AOF balances durability with throughput, while health-gated startup in Docker Compose helps services wait for databases and RabbitMQ before handling traffic.</p>
 
-  <p>The Hub health endpoint validates the real data path rather than only liveness: it performs a write-read-delete cycle against Redis and a real <code>SELECT 1</code> against PostgreSQL.</p>
+  <p>The Hub health endpoint checks the real data path, not just liveness: it opens a real PostgreSQL connection and performs a write-read-delete cycle against Redis.</p>
 
   <h2>Observability</h2>
-  <p>Both services use an in-memory Prometheus collector, which avoids a Redis round trip on every counter increment. Metrics are rendered only when Prometheus scrapes <code>/api/metrics</code>.</p>
+  <p>Both services use an in-memory Prometheus collector, so there is no Redis round trip on every counter increment. Metrics are rendered only when Prometheus scrapes <code>/api/metrics</code>.</p>
 
-  <p>Histogram buckets are tuned to the workloads they measure: HTTP request latency spans 10ms to 5s, event processing spans 1ms to 1s, and event publishing uses sub-second buckets. Endpoint normalization replaces dynamic path segments with placeholders, which preserves useful per-endpoint visibility without cardinality explosion.</p>
+  <p>Histogram buckets match the workloads they measure: HTTP request latency spans 10ms to 5s, event processing spans 1ms to 1s, and event publishing uses sub-second buckets. Endpoint normalization replaces dynamic path segments with placeholders so per-endpoint visibility stays useful without cardinality explosion.</p>
 
-  <p>Structured logging closes the loop: request IDs are propagated through middleware, and event-processing steps are logged with context like event type, country, employee ID, duration, and retry count. Fatal failures are logged at <code>error</code>, non-fatal broadcast issues at <code>warning</code>, and normal execution at <code>info</code>.</p>
+  <p>Structured logging closes the loop: request IDs move through middleware, and event-processing steps are logged with context like event type, country, employee ID, duration, and retry count. Fatal failures are logged at <code>error</code>, non-fatal broadcast issues at <code>warning</code>, and normal execution at <code>info</code>.</p>

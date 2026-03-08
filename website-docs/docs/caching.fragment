@@ -1,6 +1,6 @@
 <h1>Caching Strategy</h1>
 
-  <p>Redis 7-alpine with AOF persistence protects the hot read path. The design avoids expensive fan-out invalidation: employee list caches are invalidated logically with a version counter, while per-employee checklist caches are rebuilt eagerly inside the event pipeline.</p>
+  <p>Redis 7-alpine keeps the hot read path fast. Instead of fan-out invalidation, employee lists use a version counter and per-employee checklists are rebuilt inside the event pipeline.</p>
 
   <div class="stat-grid">
     <div class="stat-box">
@@ -22,7 +22,7 @@
   </div>
 
   <div class="callout callout-success">
-    <strong>Key design choice:</strong> version-counter invalidation replaces mass key deletion. When a country changes, the system advances one version key instead of deleting every paginated cache entry.
+    <strong>Key design choice:</strong> advance one version key instead of deleting every paginated cache entry. When a country changes, the next read moves to a fresh keyspace.
   </div>
 
   <pre class="code-block"><code>Event arrives -> increment employees:{country}:v from 3 to 4
@@ -30,7 +30,7 @@ Next read    -> look up employees:USA:v4:p1:pp15 -> miss -> rebuild -> cache set
 Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
 
   <h2>Two Cache Patterns</h2>
-  <p>The platform uses two cache families because list endpoints and per-employee checklist endpoints have different access patterns and different warm-path goals.</p>
+  <p>We use two cache families because list reads and per-employee checklists behave differently.</p>
 
   <div class="pattern-grid">
     <article class="pattern-card">
@@ -41,27 +41,27 @@ Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
         </div>
         <code class="pattern-entry">employees:v</code>
       </div>
-      <p>Paginated employee lists optimize the broad read path. They are cheap to invalidate because the system never loops over every cached page key for a country.</p>
+      <p>Paginated employee lists cover the wide read path. Invalidating them stays cheap because the system never loops over every cached page key for a country.</p>
       <div class="pattern-steps">
         <div class="pattern-step">
           <span class="pattern-step-index">1</span>
           <div class="pattern-step-body">
-            <strong>Embed the version in the page key</strong>
+            <strong>Put the version in the page key</strong>
             <span>List reads resolve keys like <code>employees:{country}:v{version}:p{page}:pp{perPage}</code>.</span>
           </div>
         </div>
         <div class="pattern-step">
           <span class="pattern-step-index">2</span>
           <div class="pattern-step-body">
-            <strong>Advance one country-scoped counter</strong>
+            <strong>Advance one country counter</strong>
             <span>Any employee event increments <code>employees:{country}:v</code>, which makes the next read look at a new logical keyspace.</span>
           </div>
         </div>
         <div class="pattern-step">
           <span class="pattern-step-index">3</span>
           <div class="pattern-step-body">
-            <strong>Let stale pages expire naturally</strong>
-            <span>Old versioned keys stay in Redis until TTL expires, so invalidation work stays constant regardless of page count.</span>
+            <strong>Let old pages expire on their own</strong>
+            <span>Old versioned keys stay in Redis until TTL expires, so invalidation work stays constant no matter how many pages exist.</span>
           </div>
         </div>
       </div>
@@ -75,7 +75,7 @@ Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
         </div>
         <code class="pattern-entry">checklist</code>
       </div>
-      <p>Checklist caches optimize the narrow read path. The pipeline invalidates the affected employee key and immediately repopulates it so the next API call stays on the warm path.</p>
+      <p>Checklist caches cover a narrower read path. The pipeline clears the affected employee key and rebuilds it right away so the next API call still hits a warm key.</p>
       <div class="pattern-steps">
         <div class="pattern-step">
           <span class="pattern-step-index">1</span>
@@ -87,14 +87,14 @@ Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
         <div class="pattern-step">
           <span class="pattern-step-index">2</span>
           <div class="pattern-step-body">
-            <strong>Invalidate only the touched checklist</strong>
+            <strong>Clear only the touched checklist</strong>
             <span>When an employee event lands, the affected checklist cache entry is cleared instead of flushing unrelated employee data.</span>
           </div>
         </div>
         <div class="pattern-step">
           <span class="pattern-step-index">3</span>
           <div class="pattern-step-body">
-            <strong>Rebuild inside the same event cycle</strong>
+            <strong>Rebuild in the same event cycle</strong>
             <span>The new value is recalculated immediately, so the next checklist request hits Redis instead of waiting for a first-request miss.</span>
           </div>
         </div>
@@ -106,26 +106,26 @@ Old pages    -> employees:USA:v3:* expire naturally via TTL</code></pre>
 
   <div class="step">
     <div class="step-number">1</div>
-    <h3>Event processing decides which cache family changed</h3>
-    <p>The <code>EventProcessingPipeline</code> handles employee create, update, and delete events and triggers the matching cache invalidation path automatically.</p>
+    <h3>The pipeline decides which cache family changed</h3>
+    <p>The <code>EventProcessingPipeline</code> handles employee create, update, and delete events and picks the right invalidation path automatically.</p>
   </div>
 
   <div class="step">
     <div class="step-number">2</div>
-    <h3>List caches invalidate logically, not physically</h3>
-    <p>The pipeline advances the country version counter, so paginated employee reads start resolving fresh keys without paying the cost of deleting every older page entry.</p>
+    <h3>List caches invalidate logically</h3>
+    <p>The pipeline advances the country version counter, so paginated employee reads switch to fresh keys without deleting every older page entry.</p>
   </div>
 
   <div class="step">
     <div class="step-number">3</div>
-    <h3>Checklist reads are re-warmed immediately</h3>
-    <p>The affected checklist cache entry is recalculated during event handling, which keeps the next employee checklist lookup on a warm key.</p>
+    <h3>Checklist caches are warmed right away</h3>
+    <p>The affected checklist cache entry is recalculated during event handling, so the next employee checklist lookup hits Redis.</p>
   </div>
 
   <div class="step">
     <div class="step-number">4</div>
     <h3>API requests stay simple</h3>
-    <p>Reads first check Redis. On a hit they return immediately; on a miss they load from PostgreSQL once, write the new cache value, and subsequent requests reuse it.</p>
+    <p>Reads check Redis first. On a hit they return immediately; on a miss they load once from PostgreSQL, store the new value, and later requests reuse it.</p>
   </div>
 
   <pre class="mermaid">
@@ -143,8 +143,8 @@ flowchart TD
 
   <h2>Redis Runtime</h2>
   <div class="card-grid">
-    <div class="card"><strong>Persistence</strong><span>AOF uses <code>appendfsync everysec</code>, which balances durability with steady Redis throughput.</span></div>
+    <div class="card"><strong>Persistence</strong><span>AOF with <code>appendfsync everysec</code> keeps a good balance between durability and throughput.</span></div>
     <div class="card"><strong>Container Durability</strong><span>The named <code>redis-data</code> volume keeps cache state and append-only files across container restarts.</span></div>
-    <div class="card"><strong>Laravel Integration</strong><span>The Hub Service uses Redis as the default cache store, so read endpoints stay close to the application hot path.</span></div>
-    <div class="card"><strong>Warm-Path Outcome</strong><span>After events refresh the relevant keys, normal API usage trends toward Redis hits instead of repeat database work.</span></div>
+    <div class="card"><strong>Laravel Integration</strong><span>The Hub Service uses Redis as the default cache store, so hot read endpoints stay close to the fast path.</span></div>
+    <div class="card"><strong>Warm-Path Outcome</strong><span>After events refresh the right keys, normal API traffic trends toward Redis hits instead of repeat database work.</span></div>
   </div>

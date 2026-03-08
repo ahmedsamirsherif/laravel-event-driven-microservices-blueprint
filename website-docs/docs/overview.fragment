@@ -1,6 +1,6 @@
 <h1>Platform Overview</h1>
 
-  <p>An <strong>Event-Driven Multi-Country Employee Onboarding Platform</strong> built as a Senior Backend Engineer coding challenge. Two independent Laravel 12 microservices communicate asynchronously through RabbitMQ, with real-time WebSocket updates, Redis caching, and full observability through Prometheus + Grafana.</p>
+  <p>This <strong>event-driven employee onboarding platform</strong> was built for a Senior Backend Engineer challenge. Two Laravel 12 services exchange messages through RabbitMQ, push real-time updates over WebSockets, cache hot reads in Redis, and expose metrics to Prometheus and Grafana.</p>
 
   <div class="stat-grid">
     <div class="stat-box"><div class="stat-number">10</div><div class="stat-label">Docker Services</div></div>
@@ -86,47 +86,3 @@ graph TB
     style HR fill:#eff6ff,stroke:#3b82f6,color:#1e3a5f
     style Hub fill:#f0fdf4,stroke:#22c55e,color:#14532d
   </pre>
-
-  <h2>Service Health</h2>
-  <p>Live deep health check endpoints — database, cache, and message broker status in one call.</p>
-  <div class="dual-code">
-    <div>
-      <div class="code-label">HR Service <code>GET /api/health</code></div>
-      <pre class="code-block"><code>{
-  "status": "ok",
-  "service": "hr-service",
-  "timestamp": "2026-03-07T03:00:48+00:00",
-  "checks": {
-    "database": {
-      "status": "ok",
-      "driver": "pgsql"
-    },
-    "rabbitmq": {
-      "status": "configured"
-    }
-  }
-}</code></pre>
-    </div>
-    <div>
-      <div class="code-label">Hub Service <code>GET /api/health</code></div>
-      <pre class="code-block"><code>{
-  "status": "ok",
-  "service": "hub-service",
-  "timestamp": "2026-03-07T03:00:48+00:00",
-  "checks": {
-    "database": {
-      "status": "ok",
-      "driver": "pgsql"
-    },
-    "cache": {
-      "status": "ok",
-      "store": "redis"
-    },
-    "rabbitmq": {
-      "status": "configured",
-      "host": "rabbitmq"
-    }
-  }
-}</code></pre>
-    </div>
-  </div>

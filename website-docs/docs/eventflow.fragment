@@ -1,5 +1,5 @@
 <h1>Event Flow</h1>
-  <p>Complete lifecycle of employee events: which classes fire them, how they cross the service boundary, and how they are consumed, projected, cached, and broadcast.</p>
+  <p>Follow an employee event from HR to RabbitMQ, into the Hub, and out to the browser.</p>
 
   <hr>
 
@@ -51,7 +51,7 @@ Event::listen(EmployeeDeleted::class, [PublishEmployeeEventToRabbitMQ::class, 'h
     }
   }
 }</code></pre>
-  <p>The <code>employeePayload()</code> method uses <code>Arr::only()</code> to whitelist exactly these fields from the model: <code>id</code>, <code>name</code>, <code>last_name</code>, <code>salary</code>, <code>country</code>, <code>ssn</code>, <code>address</code>, <code>goal</code>, <code>tax_id</code>, plus the five <code>doc_*</code> fields.</p>
+  <p>The <code>employeePayload()</code> method whitelists these model fields via <code>Arr::only()</code>: <code>id</code>, <code>name</code>, <code>last_name</code>, <code>salary</code>, <code>country</code>, <code>ssn</code>, <code>address</code>, <code>goal</code>, <code>tax_id</code>, plus the five <code>doc_*</code> fields.</p>
 
   <h2>3. Publisher — AMQP Transport (HR Service)</h2>
   <p><code>RabbitMQPublisher</code> (in <code>app/Infrastructure/Messaging/</code>) handles the AMQP connection:</p>
@@ -91,7 +91,7 @@ DLX: employee_events_dlx (fanout, durable)
     <li><code>basic_qos(prefetch=1)</code> — one message at a time</li>
     <li><code>basic_consume()</code> starts the loop; polls with 1s timeout</li>
   </ol>
-  <p>On message receipt, <code>processMessage()</code> runs:</p>
+  <p>When a message arrives, <code>processMessage()</code> does this:</p>
   <pre><code>1. JSON-decode the body
 2. Pass payload array to EventProcessingPipeline::process()
 3. On success:
@@ -154,10 +154,10 @@ $pipeline->pipe($app->make(EmployeeDeletedHandler::class));</code></pre>
   </ol>
 
   <h3>EmployeeDeletedHandler</h3>
-  <p>Same as above except calls <code>repository->delete($employeeId)</code> instead of upsert.</p>
+  <p>Same flow, but it calls <code>repository->delete($employeeId)</code> instead of upsert.</p>
 
   <h3>ProjectionDataBuilder</h3>
-  <p>Maps the raw employee array to a flat structure matching <code>employee_projections</code> columns. Includes <code>raw_data</code> (the full employee array stored as JSON) for future extensibility.</p>
+  <p>Maps the raw employee array to the flat <code>employee_projections</code> shape. It also stores <code>raw_data</code> (the full employee array as JSON) for future use.</p>
 
   <h2>8. Broadcasting — WebSocket (Hub Service)</h2>
   <p>After the pipeline succeeds, <code>RabbitMQConsumer</code> dispatches <code>EmployeeUpdatedBroadcast</code>:</p>
@@ -203,8 +203,8 @@ $pipeline->pipe($app->make(EmployeeDeletedHandler::class));</code></pre>
   |<--------------------------------------------- WS push: employee.updated --------------------------------------------|</code></pre>
 
   <h2>10. Data Contract</h2>
-  <p>The shared contract is defined in <code>contracts/employee-event.schema.json</code> (JSON Schema 2020-12).</p>
-  <p>Both services have contract tests validating payloads against this schema. The <code>schema_version</code> field (<code>"1.0"</code>) is included in every event for future evolution. <code>CountryCode</code> enum is consciously duplicated in each service to avoid shared-library coupling.</p>
+  <p>The shared contract lives in <code>contracts/employee-event.schema.json</code> (JSON Schema 2020-12).</p>
+  <p>Both services validate payloads against it in contract tests. The <code>schema_version</code> field (<code>"1.0"</code>) stays in every event for future changes. <code>CountryCode</code> is intentionally duplicated in each service so the schema, not a shared PHP package, stays the source of truth.</p>
 
   <h2>11. Key Classes Reference</h2>
   <table>

@@ -1,7 +1,7 @@
 <h1>Installation &amp; Setup</h1>
 
   <div class="callout">
-    <strong>One-command startup.</strong> The entire platform — 10 services, migrations, keys — starts with a single Docker Compose command.
+    <strong>One-command startup.</strong> One command brings up the whole platform: 10 services, app keys, and database migrations.
   </div>
 
   <h2>Prerequisites</h2>
@@ -27,7 +27,7 @@ cd laravel-event-driven-microservices-blueprint</code></pre>
   <div class="step">
     <div class="step-number">2</div>
     <h3>Start the Platform</h3>
-    <p>This single command builds all images, starts 10 containers, generates APP_KEYs, and runs database migrations:</p>
+    <p>This command builds the images, starts the 10 containers, generates APP_KEY values, and runs the database migrations:</p>
     <pre><code>docker compose up -d --build</code></pre>
     <p>Or use the Makefile shorthand:</p>
     <pre><code>make up</code></pre>
@@ -55,11 +55,11 @@ cd laravel-event-driven-microservices-blueprint</code></pre>
 
   <div class="step">
     <div class="step-number">4</div>
-    <h3>Verify Health Endpoints</h3>
+    <h3>Check the Health Endpoints</h3>
     <pre><code># HR Service health
 curl http://localhost:8001/api/health
 
-# Hub Service health  (includes DB + Redis + RabbitMQ)
+# Hub Service health (includes DB + Redis + RabbitMQ)
 curl http://localhost:8002/api/health</code></pre>
   </div>
 
@@ -123,3 +123,47 @@ curl http://localhost:8002/api/health</code></pre>
       <tr><td>Hub PostgreSQL</td><td><code>hub_user</code></td><td><code>hub_password</code></td></tr>
     </tbody>
   </table>
+
+  <h2>Service Health</h2>
+  <p>These deep health endpoints show database, cache, and message broker status in one call.</p>
+  <div class="dual-code">
+    <div>
+      <div class="code-label">HR Service <code>GET /api/health</code></div>
+      <pre class="code-block"><code>{
+  "status": "ok",
+  "service": "hr-service",
+  "timestamp": "2026-03-07T03:00:48+00:00",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "driver": "pgsql"
+    },
+    "rabbitmq": {
+      "status": "configured"
+    }
+  }
+}</code></pre>
+    </div>
+    <div>
+      <div class="code-label">Hub Service <code>GET /api/health</code></div>
+      <pre class="code-block"><code>{
+  "status": "ok",
+  "service": "hub-service",
+  "timestamp": "2026-03-07T03:00:48+00:00",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "driver": "pgsql"
+    },
+    "cache": {
+      "status": "ok",
+      "store": "redis"
+    },
+    "rabbitmq": {
+      "status": "configured",
+      "host": "rabbitmq"
+    }
+  }
+}</code></pre>
+    </div>
+  </div>

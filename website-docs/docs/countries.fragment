@@ -1,6 +1,6 @@
 <h1>Country Modules</h1>
 
-  <p>The platform uses an <strong>auto-discovering convention-based architecture</strong>. Adding a new country requires zero changes to existing code — just create files in the right directories.</p>
+  <p>Country support is convention based. To add a new country, create the expected files in the expected folders.</p>
 
   <h2>Supported Countries</h2>
   <div class="card-grid">
@@ -28,9 +28,9 @@ graph LR
 
   <h2>Adding a New Country</h2>
   <ol>
-    <li>Add case to <code>CountryCode</code> enum (both services)</li>
-    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Fields.php</code> implementing <code>CountryFieldsInterface</code> (HR)</li>
-    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Module.php</code> implementing <code>CountryModuleInterface</code> (Hub)</li>
-    <li>Update event schema contract (if new fields)</li>
-    <li>Add tests — done!</li>
+    <li>Add the ISO3 code to the <code>CountryCode</code> enum in both services</li>
+    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Fields.php</code> implementing <code>CountryFieldsInterface</code> in HR</li>
+    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Module.php</code> implementing <code>CountryModuleInterface</code> in Hub</li>
+    <li>Update the event schema if the country adds new fields</li>
+    <li>Add tests</li>
   </ol>

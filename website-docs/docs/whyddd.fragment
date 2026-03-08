@@ -1,10 +1,10 @@
 <h1>Why DDD?</h1>
-  <p>This platform uses <strong>Pragmatic Domain-Driven Design</strong> instead of the conventional Laravel MVC approach. This page explains the reasoning, the trade-offs, and what each layer provides compared to the default Laravel structure.</p>
+  <p>This platform uses <strong>pragmatic Domain-Driven Design</strong> instead of a default Laravel MVC layout. The goal is simple: keep business rules easy to find, test, and extend.</p>
 
   <hr>
 
   <h2>The Problem with Default Laravel Structure</h2>
-  <p>Laravel's default directory layout groups code by <em>technical role</em> — controllers in one folder, models in another, requests in a third. This works well for small applications, but as a system grows the boundaries blur:</p>
+  <p>Laravel's default directory layout groups code by <em>technical role</em>: controllers in one folder, models in another, requests in a third. That works well for small apps, but the boundaries blur as the system grows:</p>
 
   <table>
     <thead><tr><th>Concern</th><th>Default Laravel</th><th>What Goes Wrong at Scale</th></tr></thead>
@@ -38,7 +38,7 @@
   </table>
 
   <h2>What DDD Gives This Platform</h2>
-  <p>DDD organizes code by <em>business concept</em> first, <strong>technical role</strong> second. Each layer has a clear responsibility and dependency direction:</p>
+  <p>DDD organizes code by <em>business concept</em> first and <strong>technical role</strong> second. Each layer has a clear job and a clear dependency direction:</p>
 
   <pre class="mermaid">
 graph TD
@@ -57,12 +57,12 @@ graph TD
     style INF fill:#8250df,color:#fff,stroke:none
   </pre>
 
-  <p>The arrow direction is critical: <strong>Domain depends on nothing</strong>. Everything else depends on Domain. This means business rules are isolated, testable, and portable.</p>
+  <p>This arrow matters: <strong>Domain depends on nothing</strong>. Everything else depends on Domain, which keeps business rules isolated and testable.</p>
 
   <h2>Layer-by-Layer — What Lives Where</h2>
 
   <h3>Domain Layer</h3>
-  <p>Pure business logic. No framework imports, no database queries, no HTTP concerns.</p>
+  <p>Core business concepts live here. HTTP concerns stay out of the way, and delivery code does not leak in.</p>
   <table>
     <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
     <tbody>
@@ -76,7 +76,7 @@ graph TD
   </table>
 
   <h3>Application Layer</h3>
-  <p>Orchestrates domain objects to fulfill use cases. Thin — no business rules here, just coordination.</p>
+  <p>This layer coordinates use cases. It stays thin by design: no business rules, just flow control.</p>
   <table>
     <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
     <tbody>
@@ -88,7 +88,7 @@ graph TD
   </table>
 
   <h3>Infrastructure Layer</h3>
-  <p>Implements domain interfaces with concrete technology. Swappable without touching business logic.</p>
+  <p>Concrete technology lives here. It can change without rewriting business rules.</p>
   <table>
     <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
     <tbody>
@@ -101,7 +101,7 @@ graph TD
   </table>
 
   <h3>HTTP Layer</h3>
-  <p>Thin translation layer. Validates input, calls an Action, formats the response. Zero business logic.</p>
+  <p>This is the translation layer. It validates input, calls an Action, and formats the response.</p>
   <table>
     <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
     <tbody>
@@ -112,7 +112,7 @@ graph TD
   </table>
 
   <h2>Side-by-Side Comparison</h2>
-  <p>How the same "create employee" operation looks in each approach:</p>
+  <p>Here is how the same "create employee" flow looks in each approach:</p>
 
   <h3>Traditional Laravel</h3>
   <pre><code>// EmployeeController.php — everything in one place
@@ -154,25 +154,25 @@ public function execute(CreateEmployeeDTO $dto): Employee
   <h2>Why This Matters for a Multi-Country Platform</h2>
 
   <h3>1. Country Extensibility — Open/Closed Principle</h3>
-  <p>Adding a new country (e.g., France) requires <strong>zero modifications to existing code</strong>:</p>
+  <p>Adding a new country like France should not mean editing existing files:</p>
   <ul>
     <li>HR Service: Create <code>app/Domain/Country/FRA/FRAFields.php</code> implementing <code>CountryFieldsInterface</code></li>
     <li>Hub Service: Create <code>app/Domain/Country/FRA/FRAModule.php</code> implementing <code>CountryModuleInterface</code></li>
     <li><code>CountryClassResolver</code> auto-discovers it by convention — no manual registration</li>
   </ul>
-  <p>In traditional Laravel, this would mean editing controllers, validation logic, form requests, and view logic across multiple files.</p>
+  <p>In a default Laravel structure, that usually turns into changes across controllers, validation, form requests, and view logic.</p>
 
   <h3>2. Two Services, One Domain Language</h3>
-  <p>Both HR and Hub services share the same domain vocabulary (<code>Employee</code>, <code>CountryCode</code>, domain events) while having completely independent infrastructure. DDD makes this boundary explicit — the domain is portable, the infrastructure is swappable.</p>
+  <p>Both HR and Hub use the same domain vocabulary (<code>Employee</code>, <code>CountryCode</code>, domain events) while keeping completely separate infrastructure. DDD makes that split explicit.</p>
 
   <h3>3. Event-Driven Architecture Requires Clear Boundaries</h3>
-  <p>When services communicate through events:</p>
+  <p>When services communicate through events, the boundaries matter:</p>
   <ul>
     <li><strong>Domain events</strong> (<code>EmployeeCreated</code>) are plain DTOs that carry only domain data — no framework coupling</li>
     <li><strong>Listeners</strong> in the Application layer translate domain events to infrastructure actions (publish to RabbitMQ)</li>
     <li><strong>Broadcast events</strong> (<code>EmployeeUpdatedBroadcast</code>) live in Infrastructure — they're a delivery mechanism, not a business concept</li>
   </ul>
-  <p>Without DDD layers, domain events and broadcast events get mixed together. The architecture tests enforce this separation:</p>
+  <p>Without that separation, domain events and broadcast events get mixed together. The architecture tests keep the line clear:</p>
   <pre><code>// Pest Architecture Test — enforced rule
 test('domain events do not implement ShouldBroadcast')
     ->expect('App\Domain')
@@ -189,32 +189,32 @@ test('domain events do not implement ShouldBroadcast')
       <tr><td>Contract</td><td>Event schema compliance</td><td>None — JSON Schema validation</td></tr>
     </tbody>
   </table>
-  <p>Domain value objects like <code>SSN</code> and <code>TaxId</code> are tested in complete isolation — no database, no framework boot, no HTTP stack. This keeps the unit test suite fast and focused.</p>
+  <p>Value objects like <code>SSN</code> and <code>TaxId</code> are tested in complete isolation: no database, no framework boot, no HTTP stack. That keeps the unit suite fast and focused.</p>
 
   <h2>Pragmatic, Not Purist</h2>
-  <p>This is <strong>Pragmatic DDD</strong> — not a textbook implementation. Key compromises made for Laravel compatibility:</p>
+  <p>This is <strong>pragmatic DDD</strong>, not textbook DDD. The main trade-offs are:</p>
   <table>
     <thead><tr><th>Pure DDD Would...</th><th>This Platform Does...</th><th>Rationale</th></tr></thead>
     <tbody>
       <tr>
         <td>Ban Eloquent from Domain layer</td>
         <td>Allows Eloquent Models in Domain</td>
-        <td>Fighting Laravel's ORM creates unnecessary friction. Models are the domain entities — forcing a separate "pure" entity plus a mapper adds code without adding clarity. See <a href="#deviations">ADR-003</a>.</td>
+        <td>Keeping Eloquent completely out of Domain would add mapping code without much benefit here. See <a href="#deviations">ADR-003</a>.</td>
       </tr>
       <tr>
         <td>Use Domain Services for all orchestration</td>
         <td>Uses Action classes (single-responsibility)</td>
-        <td>Actions are simpler, more testable, and align with Laravel conventions. Each Action does exactly one thing.</td>
+        <td>Actions are simpler, easier to test, and a natural fit for Laravel. Each Action does one job.</td>
       </tr>
       <tr>
         <td>Implement Aggregates with consistency boundaries</td>
         <td>Uses simple Eloquent Models as aggregates</td>
-        <td>The Employee entity doesn't have complex sub-entity relationships that warrant aggregate pattern overhead.</td>
+        <td>The Employee entity does not have complex sub-entity rules that justify full aggregate overhead.</td>
       </tr>
       <tr>
         <td>Abstract all infrastructure behind interfaces</td>
         <td>Some infrastructure classes injected directly</td>
-        <td>Cache managers and metrics services are unlikely to be swapped. Interfaces where they add value (repositories), direct injection where they don't.</td>
+        <td>Interfaces are used where swapability matters (repositories). Less volatile infrastructure classes are injected directly.</td>
       </tr>
     </tbody>
   </table>
@@ -266,4 +266,4 @@ test('domain events do not implement ShouldBroadcast')
       </tr>
     </tbody>
   </table>
-  <p>The DDD structure makes the domain visible at the folder level. Opening <code>Domain/Country/</code> immediately tells you the system handles multiple countries. Opening <code>Domain/Employee/ValueObjects/</code> tells you SSN and TaxId have validation rules. The structure communicates intent.</p>
+  <p>The folder structure tells you what the system cares about. <code>Domain/Country/</code> immediately shows multi-country behavior, and <code>Domain/Employee/ValueObjects/</code> shows that fields like SSN and TaxId carry their own rules.</p>

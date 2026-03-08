@@ -1,6 +1,6 @@
 <h1>Observability</h1>
 
-  <p>The platform provides complete observability through <strong>Prometheus</strong> metrics scraping and <strong>Grafana</strong> dashboards, covering application performance, business metrics, event pipeline health, and infrastructure status.</p>
+  <p>Observability here means you can quickly see application performance, business metrics, event pipeline health, and infrastructure status through <strong>Prometheus</strong> and <strong>Grafana</strong>.</p>
 
   <h2>Prometheus Metrics</h2>
   <table>
@@ -23,7 +23,7 @@
   <div class="screenshot-grid">
     <div class="screenshot-item">
       <img src="screenshots/prometheus-targets.png" alt="Prometheus targets page showing all 3 targets UP: hr-service, hub-service, rabbitmq" loading="lazy">
-      <div class="screenshot-caption"><span class="caption-badge badge-green">ALL UP</span> All three Prometheus scrape targets healthy — HR Service, Hub Service, RabbitMQ</div>
+      <div class="screenshot-caption"><span class="caption-badge badge-green">ALL UP</span> All three Prometheus scrape targets are up: HR Service, Hub Service, and RabbitMQ</div>
     </div>
   </div>
 

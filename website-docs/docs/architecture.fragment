@@ -1,9 +1,9 @@
 <h1>System Architecture</h1>
 
-  <p>The platform follows <strong>Pragmatic Domain-Driven Design</strong> with a 4-layer architecture. Each microservice maintains its own database and communicates exclusively through events.</p>
+  <p>The platform uses <strong>pragmatic Domain-Driven Design</strong> with four layers. HR owns the write side, Hub owns the read side, and the services communicate through events.</p>
 
   <h2>High-Level Service Topology</h2>
-  <p>The platform is easiest to read as four lanes: a <strong>write side</strong> that validates and persists employees, an <strong>event backbone</strong> that decouples services, a <strong>read side</strong> that serves projections and realtime updates, and an <strong>observability layer</strong> that monitors the whole system.</p>
+  <p>Read the platform as four lanes: a <strong>write side</strong> that validates and stores employees, an <strong>event backbone</strong> that moves messages between services, a <strong>read side</strong> that serves projections and live updates, and an <strong>observability layer</strong> that shows what the stack is doing.</p>
 
   <pre class="mermaid">
 graph LR
@@ -49,25 +49,25 @@ graph LR
   </pre>
 
   <div class="callout">
-    The diagram stays intentionally high level. The detailed operational responsibilities sit below so the Mermaid stays readable at normal page width instead of forcing every service concern into tiny nodes.
+    The diagram stays intentionally high level. The details sit below so the Mermaid stays readable at normal page width.
   </div>
 
   <div class="card-grid">
     <div class="card">
       <strong>Write Side</strong>
-      <span>HR Service validates country-specific fields, persists employees, and emits lifecycle events.</span>
+      <span>HR Service validates country-specific fields, stores employees, and emits lifecycle events.</span>
     </div>
     <div class="card">
       <strong>Event Backbone</strong>
-      <span>RabbitMQ carries <code>employee.*</code> messages so the write model and read model stay independently deployable.</span>
+      <span>RabbitMQ carries <code>employee.*</code> messages so the write model and read model can evolve independently.</span>
     </div>
     <div class="card">
       <strong>Read Experience</strong>
-      <span>Hub Consumer builds projections, Redis keeps responses fast, and Reverb pushes changes to connected clients.</span>
+      <span>Hub Consumer builds projections, Redis keeps reads fast, and Reverb pushes updates to connected clients.</span>
     </div>
     <div class="card">
       <strong>Observability</strong>
-      <span>Prometheus scrapes service and broker metrics, while Grafana turns them into operational dashboards.</span>
+      <span>Prometheus scrapes service and broker metrics, and Grafana turns them into dashboards.</span>
     </div>
   </div>
 
@@ -161,7 +161,7 @@ graph TD
 
   <h2>Architecture Rules</h2>
   <div class="callout">
-    These rules are enforced by Pest Architecture tests and verified on every CI run.
+    Pest architecture tests check these rules on every CI run.
   </div>
   <ul>
     <li><strong>Domain</strong> does NOT depend on Infrastructure or HTTP layers</li>

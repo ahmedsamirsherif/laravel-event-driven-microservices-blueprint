@@ -1,12 +1,12 @@
 <h1>Country Resolver Lifecycle</h1>
 
-<p>This page focuses on the exact runtime path that reaches the country-specific validation modules in the HR service. The key point is that the registry is <strong>bound during boot</strong> but only <strong>discovered lazily</strong> when request validation asks for it.</p>
+<p>This page shows what happens when the HR service needs country-specific validation. The registry is <strong>bound during boot</strong>, but discovery runs only when a request asks for country rules.</p>
 
 <div class="callout">
-  <strong>Registry vs resolver:</strong> <code>CountryFieldsRegistry</code> is the container-facing registry used by the request layer. It delegates discovery to <code>CountryClassResolver</code>, which scans <code>Domain/Country/*</code> and instantiates matching classes.
+  <strong>Registry vs resolver:</strong> <code>CountryFieldsRegistry</code> is what the request layer resolves from the container. It asks <code>CountryClassResolver</code> to scan <code>Domain/Country/*</code> and build matching classes.
 </div>
 
-<h2>Request to Registry Trigger</h2>
+<h2>First Request That Needs Country Rules</h2>
 <pre class="mermaid">
 sequenceDiagram
     autonumber
@@ -68,33 +68,33 @@ sequenceDiagram
     end
 </pre>
 
-<h2>What Actually Triggers It</h2>
+<h2>What Starts Discovery</h2>
 <ol>
-  <li>The registry is registered in the container by <code>AppServiceProvider</code>.</li>
-  <li>The HTTP route resolves <code>StoreEmployeeRequest</code> before the controller action executes.</li>
+  <li><code>AppServiceProvider</code> registers the registry in the container.</li>
+  <li>The route resolves <code>StoreEmployeeRequest</code> before the controller action runs.</li>
   <li><code>StoreEmployeeRequest::rules()</code> calls <code>app(CountryFieldsRegistry::class)</code>.</li>
   <li>That first container resolution runs <code>CountryFieldsRegistry::discover()</code>.</li>
-  <li>The registry uses <code>CountryClassResolver::discoverAll()</code> to build the country map.</li>
-  <li>The request then asks the registry for the selected country and merges its validation rules.</li>
+  <li>The registry calls <code>CountryClassResolver::discoverAll()</code> to build the country map.</li>
+  <li>The request asks for the selected country and merges the extra validation rules.</li>
 </ol>
 
-<h2>Why This Matters</h2>
+<h2>Why It Helps</h2>
 <div class="card-grid">
   <div class="card">
     <strong>Lazy Discovery</strong>
-    <span>No scan runs unless a request path actually needs country-specific behavior.</span>
+    <span>No directory scan runs unless a request actually needs country-specific behavior.</span>
   </div>
   <div class="card">
     <strong>Zero Manual Registration</strong>
-    <span>Adding a new country means adding the convention-matching class, not updating a switch or service map.</span>
+    <span>Add a new country by following the naming convention. No switch statement or service map to update.</span>
   </div>
   <div class="card">
     <strong>Request-Time Validation</strong>
-    <span>The selected country determines the extra rules only when request data is available.</span>
+    <span>Extra rules are picked only after request data tells us which country was selected.</span>
   </div>
 </div>
 
-<h2>Related Pages</h2>
+<h2>See Also</h2>
 <ul>
   <li><strong>Countries</strong> covers the high-level auto-discovery model and how to add a new country.</li>
   <li><strong>System Architecture</strong> shows where the resolver sits in the infrastructure layer.</li>
