@@ -7,7 +7,6 @@
     <div class="stat-box"><div class="stat-number">175</div><div class="stat-label">Tests Passing</div></div>
     <div class="stat-box"><div class="stat-number">2</div><div class="stat-label">Microservices</div></div>
     <div class="stat-box"><div class="stat-number">13</div><div class="stat-label">ADRs</div></div>
-    <div class="stat-box"><div class="stat-number">2</div><div class="stat-label">Countries</div></div>
     <div class="stat-box"><div class="stat-number">4</div><div class="stat-label">Grafana Dashboards</div></div>
   </div>
 

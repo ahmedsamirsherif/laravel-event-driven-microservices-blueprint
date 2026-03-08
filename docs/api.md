@@ -10,6 +10,7 @@
 | `PUT` | `/api/v1/employees/{id}` | Update employee |
 | `DELETE` | `/api/v1/employees/{id}` | Delete employee |
 | `GET` | `/api/v1/countries` | Supported country codes & labels |
+| `GET` | `/api/v1/steps/{country}` | Country-specific HR form steps and field schema (Blade UI) |
 | `GET` | `/api/health` | Health check |
 | `GET` | `/api/metrics` | Prometheus metrics |
 
@@ -34,12 +35,21 @@ OpenAPI docs: `http://localhost:8001/docs/api`
 | `GET` | `/api/v1/employees/{country}` | List employees by country |
 | `GET` | `/api/v1/employees/{country}/{id}` | Get employee by country |
 | `GET` | `/api/v1/checklist/{country}` | Onboarding checklist |
-| `GET` | `/api/v1/steps/{country}` | Navigation steps |
-| `GET` | `/api/v1/schema/{country}` | Server-driven UI schema |
+| `GET` | `/api/v1/steps/{country}` | Country-specific Hub navigation steps |
+| `GET` | `/api/v1/schema/{country}` | Server-driven UI schema (form fields, widgets, columns) |
 | `GET` | `/api/health` | Deep health check |
 | `GET` | `/api/metrics` | Prometheus metrics |
 
 OpenAPI docs: `http://localhost:8002/docs/api`
+
+## Steps APIs Spotlight
+
+The two `steps` endpoints serve different UI layers and should be read together:
+
+| Service | Endpoint | Returns | Used By |
+|---|---|---|---|
+| HR Service | `/api/v1/steps/{country}` | Country-specific HR form step definitions from the country fields registry | HR Blade employee create/edit form |
+| Hub Service | `/api/v1/steps/{country}` | Country-specific navigation steps from the Hub country registry | Hub onboarding navigation and screen flow |
 
 ## Error Handling
 

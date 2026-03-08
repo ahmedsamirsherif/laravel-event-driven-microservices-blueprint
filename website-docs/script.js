@@ -12,16 +12,20 @@
 
   /* ── Panel content loading ─────────────────────────── */
   const loadedPanels = new Set();
-  const docsVersion = '8';
+  const docsVersion = '10';
+
+  function sanitizePanelHtml(html) {
+    return html.replace(/<!-- Code injected by live-server -->[\s\S]*?<\/script>/gi, '');
+  }
 
   async function loadPanel(id) {
     if (loadedPanels.has(id)) return;
     const panel = document.getElementById(id);
     if (!panel) return;
     try {
-      const res = await fetch(`docs/${id}.html?v=${docsVersion}`);
+      const res = await fetch(`docs/${id}.fragment?v=${docsVersion}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const html = await res.text();
+      const html = sanitizePanelHtml(await res.text());
       panel.innerHTML = html;
       loadedPanels.add(id);
     } catch (err) {
@@ -67,6 +71,45 @@
 
   /* ── Diagram zoom modal ────────────────────────────── */
   let diagramModal = null;
+  let diagramFitFrame = 0;
+
+  function fitDiagramModalContent() {
+    if (!diagramModal || !diagramModal.classList.contains('diagram-view')) return;
+
+    const content = diagramModal.querySelector('.diagram-modal-content');
+    const pre = content ? content.querySelector('pre.mermaid') : null;
+    const svg = pre ? pre.querySelector('svg') : null;
+    if (!content || !pre || !svg) return;
+
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+    const naturalWidth = (viewBox && viewBox.width)
+      || parseFloat(svg.getAttribute('width'))
+      || svg.getBoundingClientRect().width;
+    const naturalHeight = (viewBox && viewBox.height)
+      || parseFloat(svg.getAttribute('height'))
+      || svg.getBoundingClientRect().height;
+    const availableWidth = pre.clientWidth;
+    const availableHeight = pre.clientHeight;
+
+    if (!(naturalWidth > 0 && naturalHeight > 0 && availableWidth > 0 && availableHeight > 0)) return;
+
+    const scale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+    const fittedWidth = `${Math.floor(naturalWidth * scale)}px`;
+    const fittedHeight = `${Math.floor(naturalHeight * scale)}px`;
+
+    svg.setAttribute('width', fittedWidth);
+    svg.setAttribute('height', fittedHeight);
+    svg.style.setProperty('width', fittedWidth, 'important');
+    svg.style.setProperty('height', fittedHeight, 'important');
+    svg.style.setProperty('max-width', 'none', 'important');
+    svg.style.setProperty('max-height', 'none', 'important');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  }
+
+  function scheduleDiagramFit() {
+    window.cancelAnimationFrame(diagramFitFrame);
+    diagramFitFrame = window.requestAnimationFrame(fitDiagramModalContent);
+  }
 
   function ensureDiagramModal() {
     if (diagramModal) return;
@@ -91,10 +134,14 @@
       if (e.key === 'Escape' && diagramModal.classList.contains('open'))
         closeDiagramModal();
     });
+
+    window.addEventListener('resize', scheduleDiagramFit);
   }
 
   function openDiagramModal(pre) {
     ensureDiagramModal();
+    diagramModal.classList.remove('image-view');
+    diagramModal.classList.add('diagram-view');
     const content = diagramModal.querySelector('.diagram-modal-content');
     content.innerHTML = '';
 
@@ -118,7 +165,8 @@
         flowchart: { useMaxWidth: true, htmlLabels: true },
         sequence:  { useMaxWidth: true }
       });
-      mermaid.run({ nodes: [freshPre] });
+      Promise.resolve(mermaid.run({ nodes: [freshPre] }))
+        .then(() => scheduleDiagramFit());
     } else {
       diagramModal.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -129,13 +177,14 @@
 
   function closeDiagramModal() {
     if (!diagramModal) return;
-    diagramModal.classList.remove('open', 'image-view');
+    diagramModal.classList.remove('open', 'image-view', 'diagram-view');
     document.body.style.overflow = '';
   }
 
   /* ── Image zoom ────────────────────────────────────────── */
   function openImageModal(img) {
     ensureDiagramModal();
+    diagramModal.classList.remove('diagram-view');
     diagramModal.classList.add('image-view');
     const content = diagramModal.querySelector('.diagram-modal-content');
     content.innerHTML = '';
@@ -297,7 +346,7 @@
     sidebar.classList.remove('open');
     overlay.classList.remove('active');
 
-    /* Load content from docs/{id}.html then render Mermaid */
+    /* Load content from docs/{id}.fragment then render Mermaid */
     await loadPanel(id);
     const panelEl = document.getElementById(id);
     if (panelEl) {

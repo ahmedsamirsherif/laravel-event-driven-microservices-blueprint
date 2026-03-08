@@ -10,7 +10,7 @@
       <tr><td><span class="method put">PUT</span></td><td><code>/api/v1/employees/{id}</code></td><td>Update employee</td></tr>
       <tr><td><span class="method delete">DELETE</span></td><td><code>/api/v1/employees/{id}</code></td><td>Delete employee</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/v1/countries</code></td><td>Supported country codes &amp; labels</td></tr>
-      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific form field schema (Blade UI)</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific HR form steps and field schema (Blade UI)</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/health</code></td><td>Health check</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/metrics</code></td><td>Prometheus metrics</td></tr>
     </tbody>
@@ -23,10 +23,20 @@
       <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees/{country}</code></td><td>List employees by country</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees/{country}/{id}</code></td><td>Get employee by country</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/v1/checklist/{country}</code></td><td>Onboarding checklist</td></tr>
-      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Navigation steps</td></tr>
-      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/schema/{country}</code></td><td>Server-driven UI schema</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific Hub navigation steps</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/schema/{country}</code></td><td>Server-driven UI schema (form fields, widgets, columns)</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/health</code></td><td>Deep health check</td></tr>
       <tr><td><span class="method get">GET</span></td><td><code>/api/metrics</code></td><td>Prometheus metrics</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Steps APIs Spotlight</h2>
+  <p>The two <code>steps</code> endpoints serve different UI layers and should be read together:</p>
+  <table>
+    <thead><tr><th>Service</th><th>Endpoint</th><th>Returns</th><th>Used By</th></tr></thead>
+    <tbody>
+      <tr><td>HR Service</td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific HR form step definitions from the country fields registry</td><td>HR Blade employee create/edit form</td></tr>
+      <tr><td>Hub Service</td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific navigation steps from the Hub country registry</td><td>Hub onboarding navigation and screen flow</td></tr>
     </tbody>
   </table>
 
@@ -34,12 +44,12 @@
   <p>Both services provide auto-generated OpenAPI documentation via Scramble, accessible in the browser:</p>
   <div class="screenshot-grid">
     <div class="screenshot-item">
-      <img src="screenshots/hr-api-docs.png" alt="HR Service OpenAPI documentation showing Employee CRUD endpoints" loading="lazy">
-      <div class="screenshot-caption"><span class="caption-badge badge-green">HR SERVICE</span> OpenAPI docs — Employee CRUD endpoints with request/response schemas</div>
+      <img src="screenshots/hr-api-docs.png" alt="HR Service OpenAPI documentation showing Employee CRUD, countries, and country-specific steps endpoints" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-green">HR SERVICE</span> OpenAPI docs — Employee CRUD, countries, and country-specific steps endpoints with request/response schemas</div>
     </div>
     <div class="screenshot-item">
-      <img src="screenshots/hub-api-docs.png" alt="Hub Service OpenAPI documentation showing Checklist, Schema, Steps endpoints" loading="lazy">
-      <div class="screenshot-caption"><span class="caption-badge badge-purple">HUB SERVICE</span> OpenAPI docs — Checklist, Schema, Steps, and Employee projection endpoints</div>
+      <img src="screenshots/hub-api-docs.png" alt="Hub Service OpenAPI documentation showing checklist, navigation steps, schema, and employee projection endpoints" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-purple">HUB SERVICE</span> OpenAPI docs — Checklist, navigation steps, schema, and employee projection endpoints</div>
     </div>
   </div>
 
