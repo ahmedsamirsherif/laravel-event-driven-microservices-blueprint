@@ -1,6 +1,6 @@
 # Grafana Dashboards
 
-Four auto-provisioned dashboards provide operational visibility into the platform. They are loaded from JSON files on first boot — no manual import needed.
+Five auto-provisioned dashboards provide operational visibility into the platform. They are loaded from JSON files on first boot — no manual import needed.
 
 Access at `http://localhost:3001` (admin / admin).
 
@@ -40,6 +40,10 @@ Infrastructure monitoring — service uptime, cache performance, RabbitMQ resour
 | Cache Hit Rate | Redis cache efficiency gauge |
 | Cache Hits vs Misses | Time-series cache performance |
 | RabbitMQ Resources | Memory, connections, queues |
+
+## 5. Operations Center
+
+Unified operational view — RPS, WebSocket broadcasts, cache hit ratios, and bottleneck analysis.
 
 ## Dashboard Files
 

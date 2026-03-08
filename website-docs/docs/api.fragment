@@ -17,6 +17,7 @@
   </table>
 
   <h2>Hub Service — <code>localhost:8002</code></h2>
+
   <table>
     <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
     <tbody>

@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
 
-.PHONY: up down logs status clean build \
+.PHONY: up down logs status clean build demo-monitor \
         test test-hr test-hub test-unit test-feature test-integration test-arch test-contract \
-        hr-shell hub-shell fresh migrate replay-events verify help
+        hr-shell hub-shell fresh migrate replay-events nuke verify help
 
 
 # ── Infrastructure ────────────────────────────────────────────────────────
@@ -18,6 +18,9 @@ clean:
 
 build:
 	docker compose build
+
+demo-monitor:
+	./scripts/demo-monitor.sh
 
 logs:
 	docker compose logs -f
@@ -76,6 +79,21 @@ fresh:
 
 replay-events:
 	docker compose exec hub-service php artisan events:replay
+
+nuke:
+	@echo "\033[1;31m⚠  Tearing down everything…\033[0m"
+	docker compose down -v --remove-orphans
+	@echo "\033[1;33m⏳ Rebuilding & starting services…\033[0m"
+	docker compose up -d --build
+	@echo "\033[1;33m⏳ Waiting for databases…\033[0m"
+	@sleep 5
+	docker compose exec -T hr-service php artisan migrate:fresh --seed
+	docker compose exec -T hub-service php artisan migrate:fresh
+	docker compose exec -T hr-service php artisan optimize:clear
+	docker compose exec -T hub-service php artisan optimize:clear
+	docker compose exec -T hr-service sh -c 'rm -f storage/logs/*.log'
+	docker compose exec -T hub-service sh -c 'rm -f storage/logs/*.log'
+	@echo "\033[1;32m✔  Clean slate ready.\033[0m"
 
 # ── Verify ────────────────────────────────────────────────────────────────
 verify:

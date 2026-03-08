@@ -1,5 +1,5 @@
 <h1>Logging</h1>
-  <p>Both services use Laravel's logging system with <strong>structured context</strong> and <strong>stderr output</strong> for Docker-native log aggregation.</p>
+  <p>Both services use Laravel's logging system with <strong>structured context</strong> and <strong>stderr output</strong> for Docker-native log collection.</p>
 
   <hr>
 
@@ -13,8 +13,9 @@
       <tr><td>Format</td><td>Laravel default (timestamp + channel + level + message + context JSON)</td><td>Monolog default formatter</td></tr>
     </tbody>
   </table>
-  <p>All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures. Logs are accessible via:</p>
-  <pre><code>docker compose logs hr-service        # HR logs
+  <p>All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures as JSON logs.</p>
+  <pre><code># CLI — Docker log access
+docker compose logs hr-service        # HR logs
 docker compose logs hub-consumer      # Consumer pipeline logs
 docker compose logs -f                # Follow all services</code></pre>
 

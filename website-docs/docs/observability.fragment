@@ -43,3 +43,4 @@
     metrics_path: /metrics
     static_configs:
       - targets: ['rabbitmq:15692']</code></pre>
+

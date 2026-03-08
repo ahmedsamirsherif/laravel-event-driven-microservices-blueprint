@@ -87,7 +87,7 @@
         const deleteConfirm = document.getElementById('delete-confirm');
 
         const state = {
-            country: 'USA',
+            country: localStorage.getItem('hr_selected_country') || 'USA',
             page: 1,
             lastPage: 1,
             perPage: pageConfig.perPage || 15,
@@ -139,6 +139,7 @@
                 button.addEventListener('click', () => {
                     state.country = button.dataset.country || state.country;
                     state.page = 1;
+                    localStorage.setItem('hr_selected_country', state.country);
                     syncCountryButtons();
                     loadEmployees();
                 });

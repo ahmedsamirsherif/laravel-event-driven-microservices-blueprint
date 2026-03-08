@@ -1,6 +1,6 @@
 <h1>Grafana Dashboards</h1>
 
-  <p>Four auto-provisioned dashboards provide operational visibility into the platform. They are loaded from JSON files on first boot — no manual import needed. Access at <strong>http://localhost:3001</strong> (admin/admin).</p>
+  <p>Five auto-provisioned dashboards provide operational visibility into the platform. They are loaded from JSON files on first boot — no manual import needed. Access at <strong>http://localhost:3001</strong> (admin/admin).</p>
 
   <div class="screenshot-grid">
     <div class="screenshot-item">
@@ -62,3 +62,6 @@
       <div class="screenshot-caption"><span class="caption-badge badge-green">HEALTHY</span> Infrastructure — all services UP, cache hit rate visible, RabbitMQ resources nominal</div>
     </div>
   </div>
+
+  <h2>5. Operations Center</h2>
+  <p>Unified operational view — RPS, WebSocket broadcasts, cache hit ratios, and bottleneck analysis across all services.</p>

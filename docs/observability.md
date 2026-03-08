@@ -41,6 +41,6 @@ Access Prometheus at `http://localhost:9090`.
 
 ## Grafana Dashboards
 
-Four auto-provisioned dashboards — loaded from JSON files on first boot, no manual import needed.
+Five auto-provisioned dashboards loaded from JSON files on first boot, no manual import needed.
 
 Access at `http://localhost:3001` (admin / admin). See [grafana.md](grafana.md) for details on each dashboard.

@@ -40,22 +40,34 @@ JSON Schema 2020-12 at `contracts/employee-event.schema.json` serves as the shar
 
 ## Deliberate Deviations from the Challenge Spec
 
-### 1. WebSocket: Laravel Reverb instead of Pusher/Soketi
+### 1. Laravel Reverb instead of Pusher/Soketi
 
-The spec lists Pusher and Soketi. We chose **Laravel Reverb** — the official first-party WebSocket server shipped with Laravel 11+. It needs no external account, uses the same `pusher` broadcast driver protocol, and runs as a Docker container like every other service.
+Reverb is Laravel's first-party WebSocket server (11+). Same `pusher` protocol, zero external accounts, runs as a container like everything else.
 
 ### 2. Two PostgreSQL instances instead of one
 
-The spec lists one PostgreSQL service. We run two (`hr-postgres:5433`, `hub-postgres:5434`) because the challenge explicitly requires two services each with their own responsibilities. Shared instances allow cross-table queries that defeat the separation the challenge is testing.
+Each service gets its own database so cross-service queries are physically impossible — real CQRS separation, not just logical.
 
-### 3. ISO 3166-1 alpha-3 country codes instead of plain strings
+### 3. ISO 3166-1 alpha-3 codes instead of plain strings
 
-The spec uses `"country": "Germany"` in payload examples. We use `"country": "DEU"`. ISO codes are type-safe (backed enum), standard for routing keys, and stable regardless of display name changes.
+We use `"DEU"` instead of `"Germany"`. Enum-backed ISO codes are type-safe, work as routing keys, and don't break when display names change.
 
 ### 4. Full idempotency pipeline instead of basic error handling
 
-Beyond the spec's "implement proper error handling", we added: 3 retries with exponential backoff, Dead Letter Exchange + Queue, `processed_events` table for idempotency, and `event_log` append-only audit table. These are standard production RabbitMQ patterns.
+3 retries with backoff, DLX/DLQ for poison messages, `processed_events` dedup table, and `event_log` audit trail. Standard production RabbitMQ patterns.
 
-### 5. Path parameters instead of query strings for country
+### 5. Versioned path-parameter API
 
-The spec defines `GET /api/checklists?country=USA`. We use `GET /api/v1/checklist/USA`. Path parameters make the country a first-class resource identifier, work correctly with HTTP caching layers, and produce cleaner OpenAPI documentation. The `v1` prefix adds API versioning.
+Spec uses `GET /api/checklists?country=USA`, we use `GET /api/v1/checklist/USA`. Country is a resource scope (not a filter), path segments cache naturally, and `/v1/` gives us a migration path.
+
+### 6. Integration tests mock AMQP transport
+
+Tests inject payloads directly into `EventProcessingPipeline` and verify projection → cache → broadcast without a running broker. Fast, deterministic, CI-friendly.
+
+### 7. README links to docs instead of inlining trade-offs
+
+A concise README that points to organized docs stays in sync better than a monolithic one. All trade-off detail lives here and in the 13 ADRs.
+
+### 8. Logging docs may lag behind code
+
+After refactoring to `Log::shareContext` and `[Class][method]` prefixes, some doc sections may reference older patterns. Code is the source of truth.

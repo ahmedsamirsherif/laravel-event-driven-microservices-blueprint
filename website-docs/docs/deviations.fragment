@@ -44,25 +44,67 @@
   <p>The shared contract lives in <code>contracts/employee-event.schema.json</code> as JSON Schema 2020-12. Both services validate against it in contract tests. The <code>CountryCode</code> enum is intentionally duplicated in each service so the schema stays the source of truth instead of a shared PHP package.</p>
 </article>
 
+<h2>Deliberate Deviations from the Challenge Spec</h2>
+
+<article class="deviation">
+  <h3>1. Laravel Reverb instead of Pusher/Soketi</h3>
+  <p>Reverb is Laravel's first-party WebSocket server (11+). Same <code>pusher</code> protocol, zero external accounts, runs as a container like everything else.</p>
+</article>
+
+<article class="deviation">
+  <h3>2. Two PostgreSQL instances instead of one</h3>
+  <p>Each service gets its own database so cross-service queries are physically impossible — real CQRS separation, not just logical.</p>
+</article>
+
+<article class="deviation">
+  <h3>3. ISO 3166-1 alpha-3 codes instead of plain strings</h3>
+  <p>We use <code>"DEU"</code> instead of <code>"Germany"</code>. Enum-backed ISO codes are type-safe, work as routing keys, and don't break when display names change.</p>
+</article>
+
+<article class="deviation">
+  <h3>4. Full idempotency pipeline instead of basic error handling</h3>
+  <p>3 retries with backoff, DLX/DLQ for poison messages, <code>processed_events</code> dedup table, and <code>event_log</code> audit trail. Standard production RabbitMQ patterns.</p>
+</article>
+
+<article class="deviation">
+  <h3>5. Versioned path-parameter API</h3>
+  <p>Spec uses <code>GET /api/checklists?country=USA</code>, we use <code>GET /api/v1/checklist/USA</code>. Country is a resource scope (not a filter), path segments cache naturally, and <code>/v1/</code> gives us a migration path.</p>
+</article>
+
+<article class="deviation">
+  <h3>6. Integration tests mock AMQP transport</h3>
+  <p>Tests inject payloads directly into <code>EventProcessingPipeline</code> and verify projection → cache → broadcast without a running broker. Fast, deterministic, CI-friendly.</p>
+</article>
+
+<article class="deviation">
+  <h3>7. README links to docs instead of inlining trade-offs</h3>
+  <p>A concise README that points to organized docs stays in sync better than a monolithic one. All trade-off detail lives here and in the 13 ADRs.</p>
+</article>
+
+<article class="deviation">
+  <h3>8. Logging docs may lag behind code</h3>
+  <p>After refactoring to <code>Log::shareContext</code> and <code>[Class][method]</code> prefixes, some doc sections may reference older patterns. Code is the source of truth.</p>
+</article>
+
 <h2>Beyond the Challenge Spec</h2>
 <p>These features go beyond the base challenge. Each one was added without changing existing country or framework code.</p>
 
 <article class="deviation">
   <h3>Germany Documentation Tab (Extra Navigation Step)</h3>
-  <p>Germany gets an extra <strong>Documentation</strong> tab. It tracks five compliance documents per employee — Work Permit, Tax Card, Health Insurance, Social Security, and Employment Contract — with per-employee Yes/Missing status and an overall completion percentage. The step is fully server-driven: <code>DEUModule::navigationSteps()</code> adds the tab, and the Blade SPA renders it without country-specific frontend conditionals.</p>
+  <p>Germany gets an extra <strong>Documentation</strong> tab tracking five compliance documents per employee with Yes/Missing status and overall completion. Fully server-driven — <code>DEUModule::navigationSteps()</code> adds the tab, the Blade SPA renders it with no country-specific frontend conditionals.</p>
 </article>
 
 <article class="deviation">
   <h3>Document Completion List for German Employees</h3>
-  <p><code>loadDocumentationView()</code> fetches employees and checklist data in parallel and renders a live matrix table. Each employee's percentage comes from checklist <code>doc_*</code> state or directly from projected employee fields. No new backend endpoint was needed because the five <code>doc_*</code> fields already live in the standard <code>employee_projections</code> row and <code>ChecklistService</code> already understands them as documentation items.</p>
+  <p><code>loadDocumentationView()</code> fetches employees and checklist data in parallel and renders a live matrix table. No new endpoint needed — the five <code>doc_*</code> fields already live in <code>employee_projections</code> and <code>ChecklistService</code> understands them.</p>
 </article>
 
 <article class="deviation">
   <h3>Named Employee Rows with Per-Field Modal Breakdown</h3>
-  <p>The base challenge asked for checklist completion, but the Hub UI now shows employee names throughout the checklist summary, checklist cards, and documentation table. Every row is clickable. The modal breaks completion down by checklist step and then by field, with ✅ / ⚠️ icons, missing-field messages, and a field-key badge. This required extending <code>ChecklistService::assembleChecklist()</code> to include <code>name</code> and <code>last_name</code>.</p>
+  <p>Hub UI shows employee names in checklist summaries, cards, and documentation table. Every row is clickable — the modal breaks completion down by step and field with status icons and missing-field messages.</p>
 </article>
 
 <article class="deviation">
   <h3>In-Browser "Simulate Event" Button</h3>
-  <p>A <strong>▶ Simulate Event</strong> button in the Hub UI top bar POSTs a randomly generated employee to the HR Service API, cycling through four personas with country-specific fields. That drives the full pipeline end to end: HR validates, RabbitMQ publishes, the Hub consumer processes, Redis invalidates, and Reverb broadcasts, all without opening a terminal.</p>
+  <p>A <strong>▶ Simulate Event</strong> button POSTs a random employee to the HR API, driving the full pipeline end to end: validation → RabbitMQ → consumer → Redis → Reverb broadcast, all without opening a terminal.</p>
 </article>

@@ -292,11 +292,23 @@
         }
         @media (max-width: 900px) {
             .app-shell { grid-template-columns: 1fr; }
-            .sidebar { flex-direction: row; flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
-            .brand { padding: 0; margin: 0; border: none; }
-            nav { flex-direction: row; gap: 4px; }
-            .sidebar-status { margin: 0; padding: 0; border: none; }
+            .sidebar {
+                flex-direction: row; align-items: center; flex-wrap: wrap;
+                gap: 8px 16px; padding: 10px 16px;
+            }
+            .brand { padding: 0; margin: 0; border: none; order: 0; }
+            .sidebar-status { margin: 0; padding: 0; border: none; order: 1; margin-left: auto; }
+            nav { display: flex; flex-direction: row; gap: 4px; order: 2; width: 100%; }
+            .nav-button { width: auto; flex: 1; justify-content: center; padding: 8px 10px; }
+            .nav-button > span:last-child { display: none; }
             .main-shell { padding: 16px; }
+            .topbar { flex-wrap: wrap; }
+            .topbar-actions { flex-wrap: wrap; width: 100%; }
+        }
+        @media (max-width: 480px) {
+            .sidebar { padding: 8px 12px; }
+            .brand-copy span { display: none; }
+            .widget-grid { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>

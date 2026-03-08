@@ -1,14 +1,50 @@
 #!/bin/bash
 # Full lifecycle seed for HR and Hub employee flows.
 # Usage: bash seed-employees.sh [USA_COUNT] [DEU_COUNT]
+#        bash seed-employees.sh --remove N --all
+#        bash seed-employees.sh --remove N --country USA
 # Env: PARALLEL, VERBOSE, MAX_RETRIES, RETRY_WAIT, UPDATE_PCT, DELETE_PCT
 
 set -euo pipefail
 
 API="http://localhost:8001/api/v1/employees"
 HUB_API="http://localhost:8002/api/v1"
-TOTAL_USA=${1:-1500}
-TOTAL_DEU=${2:-1500}
+
+# ── Parse --remove mode ──
+REMOVE_MODE=0
+REMOVE_COUNT=0
+REMOVE_SCOPE=""
+
+args=()
+while (( $# > 0 )); do
+  case $1 in
+    --remove)
+      REMOVE_MODE=1
+      REMOVE_COUNT=${2:?"--remove requires a count"}
+      shift 2
+      ;;
+    --all)
+      REMOVE_SCOPE="all"
+      shift
+      ;;
+    --country)
+      REMOVE_SCOPE=${2:?"--country requires a code (USA, DEU, ...)"}
+      shift 2
+      ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if (( REMOVE_MODE )) && [[ -z $REMOVE_SCOPE ]]; then
+  echo "Error: --remove requires --all or --country CODE" >&2
+  exit 1
+fi
+
+TOTAL_USA=${args[0]:-1500}
+TOTAL_DEU=${args[1]:-1500}
 TOTAL=$((TOTAL_USA + TOTAL_DEU))
 
 PARALLEL=${PARALLEL:-100}
@@ -920,8 +956,108 @@ print_summary() {
   echo
 }
 
+# ── Remove mode: fetch IDs from API, shuffle, delete N ──
+
+fetch_employee_ids() {
+  local country_param=$1 page=1 per_page=100 ids=() total url json page_ids
+
+  if [[ $country_param == "all" ]]; then
+    url="$API?per_page=$per_page&page="
+  else
+    url="$API?country=$country_param&per_page=$per_page&page="
+  fi
+
+  json=$(curl -fsS "${url}1" 2>/dev/null) || { echo ""; return; }
+  total=$(json_number_or_default "$json" total 0)
+
+  if (( total == 0 )); then
+    echo ""
+    return
+  fi
+
+  local last_page=$(( (total + per_page - 1) / per_page ))
+
+  for ((page=1; page<=last_page; page++)); do
+    json=$(curl -fsS "${url}${page}" 2>/dev/null) || continue
+    # Extract all "id": NNN from the data array
+    while [[ $json =~ \"id\"[[:space:]]*:[[:space:]]*([0-9]+) ]]; do
+      ids+=("${BASH_REMATCH[1]}")
+      json=${json#*"${BASH_REMATCH[0]}"}
+    done
+  done
+
+  printf '%s\n' "${ids[@]}"
+}
+
+phase_remove() {
+  local scope=$1 count=$2
+  local -a all_ids shuffled pick
+  local done_count=0 total_to_delete
+
+  phase_header "REMOVE — Deleting $count random employees (scope: $scope)"
+
+  echo "  Fetching employee IDs from HR API..."
+  mapfile -t all_ids < <(fetch_employee_ids "$scope")
+
+  if (( ${#all_ids[@]} == 0 )); then
+    echo "  No employees found. Nothing to remove."
+    echo
+    return
+  fi
+
+  echo "  Found ${#all_ids[@]} employees"
+
+  # Shuffle and pick N
+  mapfile -t shuffled < <(printf '%s\n' "${all_ids[@]}" | shuf)
+  total_to_delete=$count
+  if (( total_to_delete > ${#shuffled[@]} )); then
+    total_to_delete=${#shuffled[@]}
+    echo "  (only ${#shuffled[@]} available, deleting all)"
+  fi
+
+  echo "  Deleting $total_to_delete employees..."
+  BATCH_COUNT=0
+
+  for ((i=0; i<total_to_delete; i++)); do
+    done_count=$((done_count + 1))
+    queue_job api_delete "${shuffled[$i]}"
+    wait_for_batch "$done_count" "$total_to_delete" "REMOVE"
+  done
+
+  flush_jobs
+  show_progress "$done_count" "$total_to_delete" "REMOVE"
+  echo
+  echo "  ✓ Removed: $(count_file "$DELETE_OK_FILE") succeeded, $(count_file "$DELETE_FAIL_FILE") failed"
+  echo
+}
+
 main() {
   START_TIME=$(date +%s)
+
+  if (( REMOVE_MODE )); then
+    echo "════════════════════════════════════════════════════════════════"
+    echo "  Employee Seed Script — REMOVE MODE"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "  Remove:        $REMOVE_COUNT employees"
+    echo "  Scope:         $REMOVE_SCOPE"
+    echo "  HR API:        $API"
+    echo "  Parallelism:   $PARALLEL concurrent requests"
+    echo "  Log:           $LOG_FILE"
+    echo "════════════════════════════════════════════════════════════════"
+    echo
+    preflight
+    phase_remove "$REMOVE_SCOPE" "$REMOVE_COUNT"
+
+    local elapsed=$(( $(date +%s) - START_TIME ))
+    local ok=$(count_file "$DELETE_OK_FILE")
+    local fail=$(count_file "$DELETE_FAIL_FILE")
+    echo "════════════════════════════════════════════════════════════════"
+    echo "  REMOVE SUMMARY: $ok deleted, $fail failed — ${elapsed}s"
+    echo "════════════════════════════════════════════════════════════════"
+    echo
+    return
+  fi
+
   print_banner
   preflight
   phase_create
@@ -932,4 +1068,4 @@ main() {
   print_summary
 }
 
-main "$@"
+main

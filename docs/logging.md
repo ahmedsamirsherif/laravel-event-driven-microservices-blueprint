@@ -1,6 +1,6 @@
 # Logging
 
-Both services use Laravel's logging system with **structured context** and **stderr output** for Docker-native log aggregation.
+Both services use Laravel's logging system with **structured context** and **stderr output** for Docker-native log collection.
 
 ---
 
@@ -13,9 +13,10 @@ Both services use Laravel's logging system with **structured context** and **std
 | Driver | `monolog` with `StreamHandler` → `php://stderr` | `config/logging.php` → `stderr` channel |
 | Format | Laravel default (timestamp + channel + level + message + context JSON) | Monolog default formatter |
 
-All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures. Logs are accessible via:
+All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures as JSON logs.
 
 ```bash
+# CLI — Docker log access
 docker compose logs hr-service        # HR logs
 docker compose logs hub-consumer      # Consumer pipeline logs
 docker compose logs -f                # Follow all services

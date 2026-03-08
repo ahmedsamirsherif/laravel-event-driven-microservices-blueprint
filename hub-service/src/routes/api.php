@@ -18,6 +18,7 @@ $apiThrottle = app()->runningInConsole()
 Route::get('health', HealthController::class);
 Route::get('metrics', MetricsController::class);
 
+// ─── Versioned routes (country as path param) ───
 Route::prefix('v1')->middleware("throttle:{$apiThrottle}")->group(function () {
     // Countries: dynamically discovered from CountryRegistry
     Route::get('countries', [CountriesController::class, 'index']);
