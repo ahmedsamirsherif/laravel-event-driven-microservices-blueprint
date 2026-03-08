@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\ChecklistController;
+use App\Http\Controllers\CountriesController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MetricsController;
@@ -18,6 +19,9 @@ Route::get('health', HealthController::class);
 Route::get('metrics', MetricsController::class);
 
 Route::prefix('v1')->middleware("throttle:{$apiThrottle}")->group(function () {
+    // Countries: dynamically discovered from CountryRegistry
+    Route::get('countries', [CountriesController::class, 'index']);
+
     // Checklist: aggregate per-country validation status
     Route::get('checklist/{country}', [ChecklistController::class, 'show']);
 

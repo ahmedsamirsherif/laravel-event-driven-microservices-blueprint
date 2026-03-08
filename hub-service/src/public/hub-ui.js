@@ -1,11 +1,14 @@
 (function () {
-    const configNode = document.getElementById('page-config');
-    const config = configNode ? JSON.parse(configNode.textContent || '{}') : {};
+    // Parse country and step from the URL path: /{country}/{step}
+    const pathSegments = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/');
+    const urlCountry = (pathSegments[0] || '').toUpperCase();
+    const urlStep = pathSegments[1] || 'dashboard';
 
     const state = {
-        country: (config.country || document.body.dataset.country || 'USA').toUpperCase(),
-        step: config.step || document.body.dataset.step || 'dashboard',
-        steps: Array.isArray(config.steps) ? config.steps : [],
+        country: urlCountry || 'USA',
+        step: urlStep,
+        steps: [],
+        countries: [],
         events: [],
         showEventsPanel: false,
         employeesPage: 1,
@@ -108,7 +111,8 @@
         nav: document.getElementById('step-nav'),
         pageTitle: document.getElementById('page-title'),
         pageCopy: document.getElementById('page-copy'),
-        countryButtons: Array.from(document.querySelectorAll('[data-country-toggle]')),
+        countrySwitcher: document.getElementById('country-switcher'),
+        countryButtons: [],
         view: document.getElementById('view-container'),
         contentShell: document.getElementById('content-shell'),
         eventsToggle: document.getElementById('events-toggle'),
@@ -130,15 +134,24 @@
     init();
 
     async function init() {
-        bindCountryButtons();
         bindEventsPanel();
         bindSeedEventButton();
         updateConnectionState(false);
-        syncCountryButtons();
         renderNavigation();
         updatePageCopy();
         renderEventsPanel();
         initWebSocket();
+        await hydrateCountries();
+
+        // If no country in URL, redirect to the first supported country
+        if (!state.country || !state.countries.some((c) => c.code === state.country)) {
+            const defaultCountry = state.countries[0]?.code || 'USA';
+            window.location.href = `/${defaultCountry}/dashboard`;
+            return;
+        }
+
+        document.title = `${state.country} · ${state.step.charAt(0).toUpperCase() + state.step.slice(1)} · Hub Service`;
+
         await hydrateSteps();
 
         try {
@@ -155,12 +168,36 @@
                 state.steps = response.data;
             }
         } catch (error) {
-            if (!state.steps.length) {
-                state.steps = getDefaultSteps(state.country);
-            }
+            // Steps API failed — leave steps empty so navigation shows the error state
         }
 
         renderNavigation();
+    }
+
+    async function hydrateCountries() {
+        try {
+            const response = await request('/api/v1/countries');
+            if (Array.isArray(response.data) && response.data.length > 0) {
+                state.countries = response.data;
+            }
+        } catch (error) {
+            // Countries API failed — fall back to current country only
+            state.countries = [{ code: state.country, label: state.country }];
+        }
+
+        renderCountryButtons();
+    }
+
+    function renderCountryButtons() {
+        if (!dom.countrySwitcher) return;
+
+        dom.countrySwitcher.innerHTML = state.countries.map((c) => {
+            const active = c.code === state.country;
+            return `<button type="button" class="toggle-button" data-country-toggle="${escapeHtml(c.code)}" aria-pressed="${active ? 'true' : 'false'}">${escapeHtml(c.label)}</button>`;
+        }).join('');
+
+        dom.countryButtons = Array.from(dom.countrySwitcher.querySelectorAll('[data-country-toggle]'));
+        bindCountryButtons();
     }
 
     function bindCountryButtons() {
@@ -233,9 +270,19 @@
             return;
         }
 
-        const steps = getDefaultSteps(targetCountry);
-        const stepExists = state.step === 'checklist' || steps.some((step) => step.key === state.step);
-        const nextStep = stepExists ? state.step : (steps[0]?.key || 'dashboard');
+        // Fetch the target country's steps from the API to determine valid navigation
+        let targetSteps = [];
+        try {
+            const response = await request(`/api/v1/steps/${targetCountry}`);
+            if (Array.isArray(response.data)) {
+                targetSteps = response.data;
+            }
+        } catch {
+            // Fall through — navigate to dashboard if steps can't be fetched
+        }
+
+        const stepExists = targetSteps.some((step) => step.key === state.step);
+        const nextStep = stepExists ? state.step : (targetSteps[0]?.key || 'dashboard');
 
         window.location.href = `/${targetCountry}/${nextStep}`;
     }
@@ -283,21 +330,6 @@
 
     function updatePageCopy() {
         dom.pageCopy.textContent = pageDescriptions[state.step] || '';
-    }
-
-    function getDefaultSteps(country) {
-        if (country === 'DEU') {
-            return [
-                { id: 1, key: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-                { id: 2, key: 'employees', label: 'Employees', path: '/employees' },
-                { id: 3, key: 'documentation', label: 'Documentation', path: '/documentation' },
-            ];
-        }
-
-        return [
-            { id: 1, key: 'dashboard', label: 'Dashboard', path: '/dashboard' },
-            { id: 2, key: 'employees', label: 'Employees', path: '/employees' },
-        ];
     }
 
     function syncCountryButtons() {

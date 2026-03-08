@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ strtoupper($country) }} · {{ ucfirst($step) }} · Hub Service</title>
+    <title>Hub Service</title>
     <style>
         :root {
             --bg: #f9fafb;
@@ -300,7 +300,7 @@
         }
     </style>
 </head>
-<body data-country="{{ strtoupper($country) }}" data-step="{{ $step }}">
+<body>
     <div class="app-shell">
         <aside class="sidebar">
             <div class="brand">
@@ -331,9 +331,8 @@
                     <p class="page-copy" id="page-copy"></p>
                 </div>
                 <div class="topbar-actions">
-                    <div class="toggle-group" aria-label="Country switcher">
-                        <button type="button" class="toggle-button" data-country-toggle="USA" aria-pressed="false">USA</button>
-                        <button type="button" class="toggle-button" data-country-toggle="DEU" aria-pressed="false">Germany</button>
+                    <div class="toggle-group" id="country-switcher" aria-label="Country switcher">
+                        {{-- Populated dynamically from /api/v1/countries --}}
                     </div>
                     <button type="button" class="action-button" id="seed-event-btn" title="Simulate a live employee event via API" style="border-color:#0f766e;color:#0f766e;">
                         &#9654; Simulate Event
@@ -346,7 +345,7 @@
 
             <div class="content-shell panel-hidden" id="content-shell">
                 <main class="view-panel rounded-panel" id="view-container">
-                    <div class="loading-state">Loading {{ ucfirst($step) }}...</div>
+                    <div class="loading-state">Loading...</div>
                 </main>
 
                 <div class="live-panel hidden" id="events-panel">
@@ -362,11 +361,6 @@
         </div>
     </div>
 
-    @php($pageConfig = [
-        'country' => strtoupper($country),
-        'step' => $step,
-    ])
-    <script id="page-config" type="application/json">{!! json_encode($pageConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
     <script src="{{ asset('hub-ui.js') }}" defer></script>
 </body>
 </html>
