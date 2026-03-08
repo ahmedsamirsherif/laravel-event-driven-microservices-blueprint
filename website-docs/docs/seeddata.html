@@ -1,0 +1,74 @@
+<h1>Seed Data</h1>
+
+  <p>The platform includes a comprehensive seed script that exercises the complete employee lifecycle — create, read, update, delete — with realistic data for both USA and Germany.</p>
+
+  <h2>Usage</h2>
+  <pre><code># Default: 1500 USA + 1500 DEU employees
+bash seed-employees.sh
+
+# Custom counts: 100 USA + 100 DEU
+bash seed-employees.sh 100 100
+
+# Quick test: 10 each
+bash seed-employees.sh 10 10</code></pre>
+
+  <h2>Five Lifecycle Phases</h2>
+  <div class="card-grid">
+    <div class="card"><strong>Phase 1 — Create</strong><span>Generates employees with checklist coverage tiers: 0%, 33%, 67%, 100% field completion</span></div>
+    <div class="card"><strong>Phase 2 — Read</strong><span>Queries Hub endpoints to verify event propagation and projections</span></div>
+    <div class="card"><strong>Phase 3 — Update</strong><span>Updates 30% of employees with new salaries and field changes</span></div>
+    <div class="card"><strong>Phase 4 — Delete</strong><span>Deletes 10% of employees to test deletion event flow</span></div>
+    <div class="card"><strong>Phase 5 — Verify</strong><span>Counts final totals across both services and validates consistency</span></div>
+  </div>
+
+  <h2>Data Generation Details</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Parallel Execution</td><td>Up to 100 concurrent requests (<code>PARALLEL=100</code>)</td></tr>
+      <tr><td>Retry Logic</td><td>Up to 3 retries per request with exponential backoff</td></tr>
+      <tr><td>US Names</td><td>50 first names × 50 last names pool</td></tr>
+      <tr><td>DE Names</td><td>50 first names × 50 last names pool (German names)</td></tr>
+      <tr><td>Addresses</td><td>Pool of 50 realistic US addresses</td></tr>
+      <tr><td>Goals</td><td>Pool of 50 professional development goals</td></tr>
+      <tr><td>SSN Format</td><td><code>XXX-XX-XXXX</code> (random but valid format)</td></tr>
+      <tr><td>Tax ID Format</td><td><code>DEXXXXXXXXX</code> (German tax ID format)</td></tr>
+      <tr><td>Salary Range</td><td>$30,000 — $200,000 (random)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Checklist Coverage Tiers</h2>
+  <p>Employees are created with varying field completeness to test the onboarding checklist at different coverage levels:</p>
+  <table>
+    <thead><tr><th>Tier</th><th>Fields Filled</th><th>Coverage</th></tr></thead>
+    <tbody>
+      <tr><td>Tier 1</td><td>Name only (missing required fields)</td><td>~0%</td></tr>
+      <tr><td>Tier 2</td><td>Name + salary</td><td>~33%</td></tr>
+      <tr><td>Tier 3</td><td>Name + salary + partial country fields</td><td>~67%</td></tr>
+      <tr><td>Tier 4</td><td>All fields complete</td><td>100%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Sample Output</h2>
+  <div class="terminal-block">
+<span class="t-bold t-cyan">═══ Employee Seed Script ═══</span>
+<span class="t-gray">HR Service:  http://localhost:8001</span>
+<span class="t-gray">Hub Service: http://localhost:8002</span>
+<span class="t-gray">US count:    10</span>
+<span class="t-gray">DE count:    10</span>
+
+<span class="t-yellow">▶ Phase 1: Creating employees...</span>
+<span class="t-green">  ✓ Created 20 employees (10 USA, 10 DEU)</span>
+
+<span class="t-yellow">▶ Phase 2: Reading Hub projections...</span>
+<span class="t-green">  ✓ Hub verified — projections match</span>
+
+<span class="t-yellow">▶ Phase 3: Updating 30% of employees...</span>
+<span class="t-green">  ✓ Updated 6 employees</span>
+
+<span class="t-yellow">▶ Phase 4: Deleting 10% of employees...</span>
+<span class="t-green">  ✓ Deleted 2 employees</span>
+
+<span class="t-yellow">▶ Phase 5: Final verification...</span>
+<span class="t-green t-bold">  ✓ All operations completed successfully!</span>
+  </div>

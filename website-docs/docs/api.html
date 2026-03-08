@@ -1,0 +1,65 @@
+<h1>API Reference</h1>
+
+  <h2>HR Service — <code>localhost:8001</code></h2>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees</code></td><td>List employees (paginated)</td></tr>
+      <tr><td><span class="method post">POST</span></td><td><code>/api/v1/employees</code></td><td>Create employee</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees/{id}</code></td><td>Get employee</td></tr>
+      <tr><td><span class="method put">PUT</span></td><td><code>/api/v1/employees/{id}</code></td><td>Update employee</td></tr>
+      <tr><td><span class="method delete">DELETE</span></td><td><code>/api/v1/employees/{id}</code></td><td>Delete employee</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/countries</code></td><td>Supported country codes &amp; labels</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Country-specific form field schema (Blade UI)</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/health</code></td><td>Health check</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/metrics</code></td><td>Prometheus metrics</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Hub Service — <code>localhost:8002</code></h2>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees/{country}</code></td><td>List employees by country</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/employees/{country}/{id}</code></td><td>Get employee by country</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/checklist/{country}</code></td><td>Onboarding checklist</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/steps/{country}</code></td><td>Navigation steps</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/v1/schema/{country}</code></td><td>Server-driven UI schema</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/health</code></td><td>Deep health check</td></tr>
+      <tr><td><span class="method get">GET</span></td><td><code>/api/metrics</code></td><td>Prometheus metrics</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Interactive API Documentation</h2>
+  <p>Both services provide auto-generated OpenAPI documentation via Scramble, accessible in the browser:</p>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/hr-api-docs.png" alt="HR Service OpenAPI documentation showing Employee CRUD endpoints" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-green">HR SERVICE</span> OpenAPI docs — Employee CRUD endpoints with request/response schemas</div>
+    </div>
+    <div class="screenshot-item">
+      <img src="screenshots/hub-api-docs.png" alt="Hub Service OpenAPI documentation showing Checklist, Schema, Steps endpoints" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-purple">HUB SERVICE</span> OpenAPI docs — Checklist, Schema, Steps, and Employee projection endpoints</div>
+    </div>
+  </div>
+
+  <h2>HR Service Blade UI — <code>localhost:8001</code></h2>
+  <p>The HR Service ships a Blade UI for managing employees directly in the browser — list, create, edit, and delete with country-specific field sections.</p>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hr-service-ui.png" alt="HR Service employee list showing paginated employees with masked SSNs, salary, country badge, and Edit/Delete actions" loading="lazy">
+    <figcaption>HR Service employee list — paginated table with masked SSN (***-**-XXXX), salary, USA/Germany country badges, and Edit/Delete actions. 3014 USA employees shown.</figcaption>
+  </figure>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hr-create-employee.png" alt="HR Service Create Employee form showing base fields (name, salary, country) and USA-specific SSN and Address fields" loading="lazy">
+    <figcaption>Create Employee form — base fields (first name, last name, salary, country) with a dynamic country-specific section. Selecting USA shows SSN + Address; switching to Germany shows Tax ID + Goal.</figcaption>
+  </figure>
+
+  <h2>Error Handling</h2>
+  <p>All errors return a consistent envelope format:</p>
+  <pre><code>{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Employee not found.",
+    "details": {}
+  }
+}</code></pre>

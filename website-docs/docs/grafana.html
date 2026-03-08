@@ -1,0 +1,64 @@
+<h1>Grafana Dashboards</h1>
+
+  <p>Four auto-provisioned dashboards provide operational visibility into the platform. They are loaded from JSON files on first boot — no manual import needed. Access at <strong>http://localhost:3001</strong> (admin/admin).</p>
+
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/grafana-dashboards-list.png" alt="Grafana dashboards list showing all available dashboards" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-purple">GRAFANA</span> Dashboard catalog — all dashboards auto-provisioned from JSON</div>
+    </div>
+  </div>
+
+  <h2>1. API Performance</h2>
+  <p>Real-time view of HTTP request rates, latency percentiles, and status code distribution across both services.</p>
+  <div class="card-grid">
+    <div class="card"><strong>Request Rate</strong><span>Requests per second across services</span></div>
+    <div class="card"><strong>P95 Latency</strong><span>95th percentile response time</span></div>
+    <div class="card"><strong>Services UP</strong><span>Count of healthy services</span></div>
+    <div class="card"><strong>Status Codes</strong><span>2xx/4xx/5xx breakdown</span></div>
+  </div>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/grafana-api-overview.png" alt="Grafana API Performance dashboard showing request rate, P95 latency, and service health" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-green">LIVE</span> API Performance — 0.333 req/s, P95 9.5ms, 3 services UP</div>
+    </div>
+  </div>
+
+  <h2>2. Event Pipeline Monitor</h2>
+  <p>Tracks the event-driven pipeline — published vs processed events, processing latency, and event types.</p>
+  <div class="card-grid">
+    <div class="card"><strong>Events Published</strong><span>Total events sent by HR Service</span></div>
+    <div class="card"><strong>Events Processed</strong><span>Total events consumed by Hub</span></div>
+    <div class="card"><strong>P95 Processing</strong><span>95th percentile processing time</span></div>
+    <div class="card"><strong>Event Types</strong><span>Created, Updated, Deleted breakdown</span></div>
+  </div>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/grafana-event-pipeline.png" alt="Grafana Event Pipeline dashboard showing published vs processed events and processing time" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-blue">PIPELINE</span> Event Pipeline — 32.1 published = 32.1 processed, P95 9.75ms, zero message loss</div>
+    </div>
+  </div>
+
+  <h2>3. Business Metrics</h2>
+  <p>Business-level visibility into employee operations — creation rates, updates, deletions, country distribution.</p>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/grafana-business-metrics.png" alt="Grafana Business Metrics dashboard showing employee counts by type and country" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-amber">BUSINESS</span> Business Metrics — 8.22K created, 4.48K updated, 821 deleted across USA and DEU</div>
+    </div>
+  </div>
+
+  <h2>4. Infrastructure Health</h2>
+  <p>Infrastructure monitoring — service uptime, cache performance, RabbitMQ resource usage.</p>
+  <div class="card-grid">
+    <div class="card"><strong>Service Status</strong><span>UP/DOWN for HR, Hub, RabbitMQ</span></div>
+    <div class="card"><strong>Cache Hit Rate</strong><span>Redis cache efficiency gauge</span></div>
+    <div class="card"><strong>Cache Hits vs Misses</strong><span>Time-series cache performance</span></div>
+    <div class="card"><strong>RabbitMQ Resources</strong><span>Memory, connections, queues</span></div>
+  </div>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/grafana-infrastructure.png" alt="Grafana Infrastructure dashboard showing service UP status and cache metrics" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-green">HEALTHY</span> Infrastructure — all services UP, cache hit rate visible, RabbitMQ resources nominal</div>
+    </div>
+  </div>

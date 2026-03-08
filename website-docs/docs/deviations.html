@@ -1,0 +1,68 @@
+<h1>Deviations &amp; ADRs</h1>
+
+<p>Every major design choice in this platform is captured in an Architecture Decision Record. The table below lists all 13 ADRs, followed by detailed write-ups for the most impactful decisions and the deliberate extensions made beyond the challenge spec.</p>
+
+<h2>All 13 Architecture Decision Records</h2>
+<table>
+  <thead><tr><th>#</th><th>Title</th><th>Key Decision</th></tr></thead>
+  <tbody>
+    <tr><td>001</td><td>Microservices Separation</td><td>Two independent services with separate databases</td></tr>
+    <tr><td>002</td><td>Event-Driven RabbitMQ</td><td>Topic exchange for flexible routing, persistent messages</td></tr>
+    <tr><td>003</td><td>DDD Layered Architecture</td><td>Pragmatic DDD — Eloquent permitted in Domain layer</td></tr>
+    <tr><td>004</td><td>Value Objects</td><td>Immutable, self-validating value objects for domain primitives</td></tr>
+    <tr><td>005</td><td>Redis Caching</td><td>Event-driven invalidation with eager rebuild for checklists</td></tr>
+    <tr><td>006</td><td>Country Strategy Pattern</td><td>Auto-discovering registry — adding a country = adding a directory</td></tr>
+    <tr><td>007</td><td>Laravel Reverb Broadcasting</td><td>Native Laravel WebSocket for real-time employee event updates</td></tr>
+    <tr><td>008</td><td>PCNTL Graceful Shutdown</td><td>Signal handling ensures clean consumer shutdown mid-message</td></tr>
+    <tr><td>009</td><td>Dead Letter Queue</td><td>DLX + DLQ with 3-attempt exponential backoff retry</td></tr>
+    <tr><td>010</td><td>Prometheus Metrics</td><td>Application + infra metrics auto-scraped into Grafana</td></tr>
+    <tr><td>011</td><td>Event Schema Contract</td><td>JSON Schema 2020-12 as shared integration contract</td></tr>
+    <tr><td>012</td><td>Pest Testing</td><td>Pest PHP for expressive tests + architecture enforcement</td></tr>
+    <tr><td>013</td><td>Docker Multi-Stage</td><td>3-stage Dockerfiles (base / dev / prod) for optimised images</td></tr>
+  </tbody>
+</table>
+
+<h2>Key Decisions in Detail</h2>
+
+<article class="deviation">
+  <h3>ADR-003: Pragmatic DDD</h3>
+  <p>Eloquent models are permitted in the Domain layer. Full DDD (separate repository + domain model objects) was considered too heavy for a two-service project. This keeps the codebase lean while maintaining layered architecture benefits — the Domain layer still owns the interface contracts, value objects, and domain events.</p>
+</article>
+
+<article class="deviation">
+  <h3>ADR-006: Auto-Discovering Country Strategy</h3>
+  <p>Convention-based <code>CountryClassResolver</code> replaces manual registration. It scans <code>Domain/Country/*/</code> directories, builds the FQCN as <code>App\Domain\Country\{ISO3}\{ISO3}{Suffix}</code>, and validates the interface via reflection. Adding a country = adding a single directory with one file. No service provider changes, no registry updates required.</p>
+</article>
+
+<article class="deviation">
+  <h3>ADR-009: Dead Letter Queue</h3>
+  <p>Failed messages route to a DLQ after 3 retry attempts with exponential backoff (1 s → 2 s → 4 s). This prevents poison messages from blocking the main queue while preserving them for manual inspection and replay. The DLX is a standard fanout exchange — any tooling can bind to it for alerting.</p>
+</article>
+
+<article class="deviation">
+  <h3>ADR-011: Event Schema Contract</h3>
+  <p>JSON Schema 2020-12 at <code>contracts/employee-event.schema.json</code> serves as the shared integration contract validated by both services in their contract test suites. The <code>CountryCode</code> enum is consciously duplicated in each service to avoid shared-library coupling — the schema file is the single source of truth, not a shared PHP package.</p>
+</article>
+
+<h2>Beyond the Challenge Spec</h2>
+<p>The following features extend the base challenge requirements as deliberate enhancements, each implemented without modifying existing country or framework code.</p>
+
+<article class="deviation">
+  <h3>Germany Documentation Tab (Extra Navigation Step)</h3>
+  <p>The challenge required country-specific validation fields (Tax ID, Goal) for Germany. This implementation adds a third navigation step, <strong>Documentation</strong>, that only appears for DEU. It renders a document-tracking table against five German compliance document types — Work Permit, Tax Card, Health Insurance, Social Security, Employment Contract — with per-employee Yes/Missing status and an overall docs-completion percentage. The step is entirely server-driven: <code>DEUModule::navigationSteps()</code> includes the documentation entry; the blade SPA renders the tab automatically without any country conditionals in the frontend code.</p>
+</article>
+
+<article class="deviation">
+  <h3>Document Completion List for German Employees</h3>
+  <p><code>loadDocumentationView()</code> fetches employees and checklist data in parallel and renders a live matrix table. The percentage per employee is computed from checklist <code>doc_*</code> item state or directly from projected employee fields. No backend changes were required — the five <code>doc_*</code> fields are projected as part of the standard <code>employee_projections</code> row and the <code>ChecklistService</code> treats them as documentation checklist items.</p>
+</article>
+
+<article class="deviation">
+  <h3>Named Employee Rows with Per-Field Modal Breakdown</h3>
+  <p>The challenge required a checklist endpoint showing overall completion. This implementation surfaces employee names throughout the Hub UI (checklist summary rows, checklist cards, documentation table) and makes every row clickable. The resulting modal breaks down completion by checklist step, then by individual field, showing ✅ / ⚠️ icons, the validation message for missing fields, and a field-key badge. This required extending <code>ChecklistService::assembleChecklist()</code> to include <code>name</code> and <code>last_name</code>.</p>
+</article>
+
+<article class="deviation">
+  <h3>In-Browser "Simulate Event" Button</h3>
+  <p>A <strong>▶ Simulate Event</strong> button in the Hub UI topbar POSTs a randomly generated employee (cycling through four personas with random country-specific fields) to the HR Service API. This triggers the full pipeline — HR validates → RabbitMQ publishes → Hub consumer processes → Redis cache invalidates → WebSocket broadcasts — demonstrating end-to-end flow without opening a separate terminal.</p>
+</article>

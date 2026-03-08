@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>HR Platform — Documentation</title>
+  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%230969da' rx='6' width='32' height='32'/><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='system-ui' font-weight='800' font-size='14'>HR</text></svg>">
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="top-header">
+  <div class="header-left">
+    <button class="menu-toggle" aria-label="Toggle menu">☰</button>
+    <a href="#" class="header-logo">
+      <span class="header-logo-icon">HR</span> Platform
+    </a>
+    <span class="header-sep"></span>
+    <span class="header-subtitle">Multi-Country Employee Onboarding</span>
+  </div>
+  <div class="header-right">
+    <button class="header-btn" id="themeToggle" aria-label="Toggle theme">
+      <svg class="icon-sun" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-1.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Zm5.657-8.157a.75.75 0 0 1 0 1.061l-1.061 1.06a.75.75 0 1 1-1.06-1.06l1.06-1.06a.75.75 0 0 1 1.06 0Zm-9.193 9.193a.75.75 0 0 1 0 1.06l-1.06 1.061a.75.75 0 0 1-1.061-1.06l1.06-1.061a.75.75 0 0 1 1.061 0ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0ZM3 8a.75.75 0 0 1-.75.75H.75a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 3 8Zm13 0a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 16 8Zm-8 5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13Z"/></svg>
+      <svg class="icon-moon" viewBox="0 0 16 16" fill="currentColor"><path d="M9.598 1.591a.749.749 0 0 1 .785-.175 7.001 7.001 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Z"/></svg>
+    </button>
+    <a href="https://github.com/ahmedsamirsherif" class="github-link" aria-label="GitHub" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+  </div>
+</header>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="sidebar" id="sidebar">
+  <!-- Getting Started -->
+  <nav class="sidebar-section">
+    <div class="sidebar-label">Getting Started</div>
+    <ul class="nav-list">
+      <li><a href="#overview" class="nav-link active" data-panel="overview">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 1.75ZM0 6.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 6.5Zm0 4.75A.75.75 0 0 1 .75 10.5h4.253a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75ZM15 1.75a.75.75 0 0 0-.75-.75h-4.253a.75.75 0 0 0 0 1.5h4.253a.75.75 0 0 0 .75-.75ZM10 6.5a.75.75 0 0 0 .75-.75h4.5a.75.75 0 0 0 0-1.5h-4.5A.75.75 0 0 0 10 6.5Z"/></svg>
+        Overview</a></li>
+      <li><a href="#installation" class="nav-link" data-panel="installation">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 1a.75.75 0 0 1 0 1.06L5.56 3.5h4.69a3.75 3.75 0 0 1 0 7.5H8.75a.75.75 0 0 1 0-1.5h1.5a2.25 2.25 0 0 0 0-4.5H5.56l1.22 1.22a.75.75 0 1 1-1.06 1.06l-1-1-.53-.53a1.75 1.75 0 0 1 0-2.47l.53-.53 1-1Z"/><path d="M1.75 15h12.5a.75.75 0 0 0 0-1.5H1.75a.75.75 0 0 0 0 1.5Z"/></svg>
+        Installation</a></li>
+    </ul>
+  </nav>
+
+  <!-- Architecture -->
+  <nav class="sidebar-section">
+    <div class="sidebar-label">Architecture</div>
+    <ul class="nav-list">
+      <li class="nav-group"><a href="#architecture" class="nav-link" data-panel="architecture">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1.75V13.5h13.25a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.75.75 0 0 1-1.06-1.06l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.75.75 0 1 1 1.06 1.06Z"/></svg>
+        System Architecture</a>
+        <ul class="nav-sublist">
+          <li><a href="#countryresolver" class="nav-link nav-sublink" data-panel="countryresolver">
+            <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.75A1.25 1.25 0 0 1 3.75 2.5h3.5A1.25 1.25 0 0 1 8.5 3.75v1.5A1.25 1.25 0 0 1 7.25 6.5h-3.5A1.25 1.25 0 0 1 2.5 5.25v-1.5Zm0 7A1.25 1.25 0 0 1 3.75 9.5h3.5A1.25 1.25 0 0 1 8.5 10.75v1.5A1.25 1.25 0 0 1 7.25 13.5h-3.5A1.25 1.25 0 0 1 2.5 12.25v-1.5ZM9.5 4a.75.75 0 0 1 .75-.75h2a.75.75 0 0 1 0 1.5h-2A.75.75 0 0 1 9.5 4Zm0 8a.75.75 0 0 1 .75-.75h2a.75.75 0 0 1 0 1.5h-2A.75.75 0 0 1 9.5 12Zm-1.22-6.28a.75.75 0 0 1 1.06 0l1.16 1.16 1.16-1.16a.75.75 0 1 1 1.06 1.06l-1.16 1.16 1.16 1.16a.75.75 0 1 1-1.06 1.06L10.5 8.94 9.34 10.1a.75.75 0 0 1-1.06-1.06l1.16-1.16-1.16-1.16a.75.75 0 0 1 0-1.06Z"/></svg>
+            Country Resolver</a></li>
+        </ul>
+      </li>
+      <li><a href="#whyddd" class="nav-link" data-panel="whyddd">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+        Why DDD?</a></li>
+      <li><a href="#cqrs" class="nav-link" data-panel="cqrs">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 0 7 8.5h2a2.5 2.5 0 0 0 2.5-2.5v-.628a2.25 2.25 0 1 1 1.5 0V6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-.628A2.25 2.25 0 0 1 1.5 3.25Z"/></svg>
+        CQRS Pattern</a></li>
+      <li><a href="#eventflow" class="nav-link" data-panel="eventflow">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 1.75V5H12a.75.75 0 0 1 .555 1.26l-5.25 5.75a.75.75 0 0 1-1.305-.51V8.5H3a.75.75 0 0 1-.555-1.26l5.25-5.75a.75.75 0 0 1 1.055-.24Z"/></svg>
+        Event Flow</a></li>
+      <li><a href="#caching" class="nav-link" data-panel="caching">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 5.724V8c0 .248.238.7 1.169 1.159.874.43 2.144.745 3.581.805a.75.75 0 1 1-.064 1.498 12.3 12.3 0 0 1-3.792-.846C2.362 10.111 1 9.227 1 8V4.5c0-1.152 1.263-2.01 2.394-2.516C4.56 1.45 6.142 1 8 1c1.858 0 3.44.45 4.606.984C13.737 2.49 15 3.348 15 4.5V8c0 1.227-1.362 2.111-2.394 2.616A12.3 12.3 0 0 1 9.5 11.464a.75.75 0 0 1-.064-1.498c1.437-.06 2.707-.375 3.581-.806.931-.458 1.169-.91 1.169-1.16V5.724c-.49.39-1.114.717-1.786.984C11.19 7.2 9.608 7.5 8 7.5c-1.608 0-3.19-.3-4.4-.792a8.4 8.4 0 0 1-1.1-.484Z"/></svg>
+        Caching Strategy</a></li>
+    </ul>
+  </nav>
+
+  <!-- Reference -->
+  <nav class="sidebar-section">
+    <div class="sidebar-label">Reference</div>
+    <ul class="nav-list">
+      <li><a href="#api" class="nav-link" data-panel="api">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H1.75Z"/></svg>
+        API Reference</a></li>
+      <li><a href="#countries" class="nav-link" data-panel="countries">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 .2 2.014c.212.858.478 1.342.738 1.59.273.26.51.346.782.346.272 0 .51-.087.782-.346.26-.248.526-.732.738-1.59.09-.368.16-.79.2-1.264H5.78Zm4.44 0c-.04.474-.11.896-.2 1.264-.212.858-.478 1.342-.738 1.59-.273.26-.51.346-.782.346-.272 0-.51-.087-.782-.346a4.4 4.4 0 0 1-.254-.27 8.3 8.3 0 0 0 .484-1.32c.09-.368.16-.79.2-1.264h2.072Z"/></svg>
+        Countries</a></li>
+      <li><a href="#seeddata" class="nav-link" data-panel="seeddata">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm.75 4.75a.75.75 0 0 0-1.5 0v2.5h-2.5a.75.75 0 0 0 0 1.5h2.5v2.5a.75.75 0 0 0 1.5 0v-2.5h2.5a.75.75 0 0 0 0-1.5h-2.5Z"/></svg>
+        Seed Data</a></li>
+      <li><a href="#testing" class="nav-link" data-panel="testing">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-1.042-.018.751.751 0 0 0-.018 1.042L8.31 9.72 7.282 8.69a.75.75 0 0 0-1.06 1.06l1.56 1.56a.749.749 0 0 0 1.06 0l3.94-3.94Z"/></svg>
+        Testing</a></li>
+      <li><a href="#observability" class="nav-link" data-panel="observability">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 1.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM.75 7.25h1.5a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1 0-1.5Zm12 0h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0Zm0 12a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 12Z"/></svg>
+        Observability</a></li>
+      <li><a href="#logging" class="nav-link" data-panel="logging">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M5 8.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 5 8.25ZM4 10.5A.75.75 0 0 0 4 12h4a.75.75 0 0 0 0-1.5H4ZM6 6.75a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5A.75.75 0 0 1 6 6.75ZM4.75 4.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM2 13.25V2.75C2 2.336 2.336 2 2.75 2h10.5c.414 0 .75.336.75.75v10.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75Zm1.5-.75h9v-9.5h-9v9.5Z"/></svg>
+        Logging</a></li>
+      <li><a href="#grafana" class="nav-link" data-panel="grafana">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 1.75V13.5h13.25a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.75.75 0 0 1-1.06-1.06l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.75.75 0 1 1 1.06 1.06Z"/></svg>
+        Grafana Dashboards</a></li>
+      <li><a href="#hubui" class="nav-link" data-panel="hubui">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.5 0v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Z"/><path d="M3.25 4.5a.75.75 0 0 1 .75-.75h8a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1-.75-.75ZM3.25 7a.75.75 0 0 1 .75-.75h8a.75.75 0 0 1 0 1.5H4A.75.75 0 0 1 3.25 7Zm0 2.5a.75.75 0 0 1 .75-.75h4a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1-.75-.75Z"/></svg>
+        Hub Service UI</a></li>
+      <li><a href="#deviations" class="nav-link" data-panel="deviations">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+        Deviations &amp; ADRs</a></li>
+    </ul>
+  </nav>
+
+  <!-- Author -->
+  <div class="sidebar-footer">
+    <div class="author-block">
+      <span class="author-avatar">AS</span>
+      <div class="author-info">
+        <div class="author-name">Ahmed Samir</div>
+        <div class="author-handle"><a href="https://github.com/ahmedsamirsherif" target="_blank" rel="noopener">@ahmedsamirsherif</a></div>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+  <div class="content-wrapper">
+
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs">
+      <a href="#">Docs</a>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current" id="breadcrumb">Overview</span>
+    </div>
+
+<!-- ─── Panel: Overview ────────────────────────────────── -->
+<section class="panel active" id="overview">
+</section>
+
+<!-- ─── Panel: Installation ────────────────────────────── -->
+<section class="panel" id="installation">
+</section>
+
+<!-- ─── Panel: Architecture ────────────────────────────── -->
+<section class="panel" id="architecture">
+</section>
+
+<!-- ─── Panel: Why DDD? ────────────────────────────────── -->
+<section class="panel" id="whyddd">
+</section>
+
+<!-- ─── Panel: CQRS ────────────────────────────────────── -->
+<section class="panel" id="cqrs">
+</section>
+
+<!-- ─── Panel: Event Flow ──────────────────────────────── -->
+<section class="panel" id="eventflow">
+</section>
+
+<!-- ─── Panel: Caching ─────────────────────────────────── -->
+<section class="panel" id="caching">
+</section>
+
+<!-- ─── Panel: API Reference ───────────────────────────── -->
+<section class="panel" id="api">
+</section>
+
+<!-- ─── Panel: Countries ───────────────────────────────── -->
+<section class="panel" id="countries">
+</section>
+
+<!-- ─── Panel: Country Resolver ───────────────────────── -->
+<section class="panel" id="countryresolver">
+</section>
+
+<!-- ─── Panel: Seed Data ───────────────────────────────── -->
+<section class="panel" id="seeddata">
+</section>
+
+<!-- ─── Panel: Testing ─────────────────────────────────── -->
+<section class="panel" id="testing">
+</section>
+
+<!-- ─── Panel: Observability ───────────────────────────── -->
+<section class="panel" id="observability">
+</section>
+<!-- ─── Panel: Logging ──────────────────────────────── -->
+<section class="panel" id="logging">
+</section>
+<!-- ─── Panel: Grafana Dashboards ──────────────────────── -->
+<section class="panel" id="grafana">
+</section>
+
+<!-- ─── Panel: Hub Service UI ───────────────────────────── -->
+<section class="panel" id="hubui">
+</section>
+
+<!-- ─── Panel: Deviations ──────────────────────────────── -->
+<section class="panel" id="deviations">
+</section>
+
+  </div><!-- /content-wrapper -->
+</div><!-- /main -->
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="page-footer">
+  <div class="footer-inner">
+    <span>HR Platform Documentation — Ahmed Samir</span>
+    <span>Built with Laravel 12 · PHP 8.3 · Docker Compose</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="script.js?v=8"></script>
+</body>
+</html>

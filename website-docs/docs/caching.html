@@ -1,0 +1,29 @@
+<h1>Caching Strategy</h1>
+
+  <p>Redis 7-alpine with AOF persistence provides the caching layer. Cache invalidation is event-driven — triggered automatically when the EventProcessingPipeline processes employee events.</p>
+
+  <h2>Cache Keys</h2>
+  <table>
+    <thead><tr><th>Pattern</th><th>TTL</th><th>Purpose</th><th>Invalidation</th></tr></thead>
+    <tbody>
+      <tr><td><code>employees:{country}:page:{n}:per:{m}</code></td><td>1 hour</td><td>Paginated employee lists</td><td>Any employee event for country</td></tr>
+      <tr><td><code>checklist:{country}:{employeeId}</code></td><td>1 hour</td><td>Per-employee checklist</td><td>Employee event + eager rebuild</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Eager Rebuild</h2>
+  <div class="callout callout-success">
+    <strong>Checklist caches use eager rebuild</strong> — after invalidation, the new value is immediately recalculated and cached. This means the next API request always hits warm cache.
+  </div>
+
+  <h2>Cache Flow</h2>
+  <pre class="mermaid">
+graph LR
+    Event[Employee Event] -->|Pipeline| IC[Invalidate Cache]
+    IC -->|Clear| EC[Employee Cache<br/>Pages 1-100]
+    IC -->|Clear + Rebuild| CC[Checklist Cache<br/>Eager Rebuild]
+
+    API[API Request] -->|Cache Hit| Redis[(Redis)]
+    API -->|Cache Miss| DB[(PostgreSQL)]
+    DB -->|Store| Redis
+  </pre>

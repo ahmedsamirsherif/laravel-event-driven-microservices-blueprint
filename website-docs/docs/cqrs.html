@@ -1,0 +1,47 @@
+<h1>CQRS Pattern</h1>
+
+  <p>The system implements <strong>Command Query Responsibility Segregation</strong> — the HR Service handles commands (writes) and the Hub Service handles queries (reads) from event-sourced projections.</p>
+
+  <h2>Write Side (HR Service)</h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant API as HR API
+    participant DB as HR PostgreSQL
+    participant MQ as RabbitMQ
+
+    C->>API: POST /api/v1/employees
+    API->>API: Validate (country-specific rules)
+    API->>DB: Insert employee
+    API->>C: 201 Created
+    API->>MQ: Publish EmployeeCreated event
+    Note over MQ: Exchange: employee_events<br/>Routing: employee.created.usa
+  </pre>
+
+  <h2>Read Side (Hub Service)</h2>
+  <pre class="mermaid">
+sequenceDiagram
+    participant MQ as RabbitMQ
+    participant Consumer as Hub Consumer
+    participant DB as Hub PostgreSQL
+    participant Redis as Redis Cache
+    participant WS as WebSocket
+    participant C as Client
+
+    MQ->>Consumer: Deliver message
+    Consumer->>Consumer: Idempotency check
+    Consumer->>DB: Upsert projection
+    Consumer->>Redis: Invalidate + rebuild cache
+    Consumer->>WS: Broadcast event
+    WS->>C: Real-time notification
+    C->>DB: GET /api/v1/employees/USA
+    Note over C,DB: Reads from projections (cached)
+  </pre>
+
+  <h2>Key Benefits</h2>
+  <ul>
+    <li><strong>Independent scaling</strong> — read and write services scale separately</li>
+    <li><strong>Optimized read models</strong> — projections are pre-computed for query efficiency</li>
+    <li><strong>Event audit trail</strong> — every state change is recorded in <code>event_logs</code></li>
+    <li><strong>Eventual consistency</strong> — Hub converges within milliseconds in practice</li>
+  </ul>

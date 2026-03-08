@@ -1,0 +1,125 @@
+<h1>Installation &amp; Setup</h1>
+
+  <div class="callout">
+    <strong>One-command startup.</strong> The entire platform — 10 services, migrations, keys — starts with a single Docker Compose command.
+  </div>
+
+  <h2>Prerequisites</h2>
+  <table>
+    <thead><tr><th>Tool</th><th>Minimum Version</th><th>Check Command</th></tr></thead>
+    <tbody>
+      <tr><td>Docker</td><td>20.10+</td><td><code>docker --version</code></td></tr>
+      <tr><td>Docker Compose</td><td>v2.0+</td><td><code>docker compose version</code></td></tr>
+      <tr><td>Git</td><td>2.30+</td><td><code>git --version</code></td></tr>
+      <tr><td>GNU Make</td><td>4.0+</td><td><code>make --version</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Quick Start</h2>
+
+  <div class="step">
+    <div class="step-number">1</div>
+    <h3>Clone the Repository</h3>
+    <pre><code>git clone https://github.com/ahmedsamirsherif/laravel-event-driven-microservices-blueprint.git
+cd laravel-event-driven-microservices-blueprint</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-number">2</div>
+    <h3>Start the Platform</h3>
+    <p>This single command builds all images, starts 10 containers, generates APP_KEYs, and runs database migrations:</p>
+    <pre><code>docker compose up -d --build</code></pre>
+    <p>Or use the Makefile shorthand:</p>
+    <pre><code>make up</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-number">3</div>
+    <h3>Wait for Health Checks</h3>
+    <p>All services include Docker health checks. Wait until all 10 services report healthy:</p>
+    <pre><code>docker compose ps</code></pre>
+    <div class="terminal-block">
+<span class="t-bold">NAME            STATUS                    PORTS</span>
+<span class="t-green">grafana         running (healthy)</span>         0.0.0.0:3001->3000/tcp
+<span class="t-green">hr-postgres     running (healthy)</span>         0.0.0.0:5433->5432/tcp
+<span class="t-green">hr-service      running (healthy)</span>         0.0.0.0:8001->80/tcp
+<span class="t-green">hub-consumer    running (healthy)</span>
+<span class="t-green">hub-postgres    running (healthy)</span>         0.0.0.0:5434->5432/tcp
+<span class="t-green">hub-service     running (healthy)</span>         0.0.0.0:8002->80/tcp
+<span class="t-green">prometheus      running</span>                   0.0.0.0:9090->9090/tcp
+<span class="t-green">rabbitmq        running (healthy)</span>         0.0.0.0:5672->5672/tcp, 0.0.0.0:15672->15672/tcp
+<span class="t-green">redis           running (healthy)</span>         6379/tcp
+<span class="t-green">reverb          running (healthy)</span>         0.0.0.0:8080->8080/tcp
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-number">4</div>
+    <h3>Verify Health Endpoints</h3>
+    <pre><code># HR Service health
+curl http://localhost:8001/api/health
+
+# Hub Service health  (includes DB + Redis + RabbitMQ)
+curl http://localhost:8002/api/health</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-number">5</div>
+    <h3>Create Your First Employee</h3>
+    <pre><code>curl -X POST http://localhost:8001/api/v1/employees \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John",
+    "last_name": "Doe",
+    "salary": 75000,
+    "country": "USA",
+    "ssn": "123-45-6789",
+    "address": "123 Main St"
+  }'</code></pre>
+    <p>Wait 2-3 seconds, then verify the Hub received it:</p>
+    <pre><code>curl http://localhost:8002/api/v1/employees/USA</code></pre>
+  </div>
+
+  <h2>All 10 Services</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Port</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>hr-service</td><td>8001</td><td>Employee CRUD API</td></tr>
+      <tr><td>hub-service</td><td>8002</td><td>Onboarding / UI APIs</td></tr>
+      <tr><td>hub-consumer</td><td>—</td><td>RabbitMQ event consumer</td></tr>
+      <tr><td>reverb</td><td>8080</td><td>WebSocket server</td></tr>
+      <tr><td>hr-postgres</td><td>5433</td><td>HR database</td></tr>
+      <tr><td>hub-postgres</td><td>5434</td><td>Hub database</td></tr>
+      <tr><td>redis</td><td>—</td><td>Cache store</td></tr>
+      <tr><td>rabbitmq</td><td>5672 / 15672</td><td>Message broker + management UI</td></tr>
+      <tr><td>prometheus</td><td>9090</td><td>Metrics scraping</td></tr>
+      <tr><td>grafana</td><td>3001</td><td>Monitoring dashboards</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Makefile Commands</h2>
+  <table>
+    <thead><tr><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>make up</code></td><td>Build &amp; start all services</td></tr>
+      <tr><td><code>make down</code></td><td>Stop all services</td></tr>
+      <tr><td><code>make restart</code></td><td>Restart all services</td></tr>
+      <tr><td><code>make logs</code></td><td>Follow container logs</td></tr>
+      <tr><td><code>make status</code></td><td>Show service status</td></tr>
+      <tr><td><code>make test</code></td><td>Run all tests (HR + Hub)</td></tr>
+      <tr><td><code>make clean</code></td><td>Stop, remove volumes &amp; orphans</td></tr>
+      <tr><td><code>make fresh</code></td><td>Fresh migrations (drop + recreate)</td></tr>
+      <tr><td><code>make verify</code></td><td>Curl all API endpoints</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Credentials</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Username</th><th>Password</th></tr></thead>
+    <tbody>
+      <tr><td>RabbitMQ Management</td><td><code>guest</code></td><td><code>guest</code></td></tr>
+      <tr><td>Grafana</td><td><code>admin</code></td><td><code>admin</code></td></tr>
+      <tr><td>HR PostgreSQL</td><td><code>hr_user</code></td><td><code>hr_password</code></td></tr>
+      <tr><td>Hub PostgreSQL</td><td><code>hub_user</code></td><td><code>hub_password</code></td></tr>
+    </tbody>
+  </table>

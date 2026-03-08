@@ -1,0 +1,133 @@
+<h1>Platform Overview</h1>
+
+  <p>An <strong>Event-Driven Multi-Country Employee Onboarding Platform</strong> built as a Senior Backend Engineer coding challenge. Two independent Laravel 12 microservices communicate asynchronously through RabbitMQ, with real-time WebSocket updates, Redis caching, and full observability through Prometheus + Grafana.</p>
+
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-number">10</div><div class="stat-label">Docker Services</div></div>
+    <div class="stat-box"><div class="stat-number">175</div><div class="stat-label">Tests Passing</div></div>
+    <div class="stat-box"><div class="stat-number">2</div><div class="stat-label">Microservices</div></div>
+    <div class="stat-box"><div class="stat-number">13</div><div class="stat-label">ADRs</div></div>
+    <div class="stat-box"><div class="stat-number">2</div><div class="stat-label">Countries</div></div>
+    <div class="stat-box"><div class="stat-number">4</div><div class="stat-label">Grafana Dashboards</div></div>
+  </div>
+
+  <h2>Key Features</h2>
+  <div class="feature-grid">
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8.75 1.75V5H12a.75.75 0 0 1 .555 1.26l-5.25 5.75a.75.75 0 0 1-1.305-.51V8.5H3a.75.75 0 0 1-.555-1.26l5.25-5.75a.75.75 0 0 1 1.055-.24Z"/></svg></div>
+      <div class="feature-content"><strong>Event-Driven Architecture</strong><span>RabbitMQ topic exchange with country-suffixed routing keys, DLQ, and exponential backoff retry</span></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM5.78 8.75a9.64 9.64 0 0 0 .2 2.014c.212.858.478 1.342.738 1.59.273.26.51.346.782.346.272 0 .51-.087.782-.346.26-.248.526-.732.738-1.59.09-.368.16-.79.2-1.264H5.78Z"/></svg></div>
+      <div class="feature-content"><strong>Multi-Country Support</strong><span>Auto-discovering country modules — add a new country with zero code changes to existing files</span></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 0 7 8.5h2a2.5 2.5 0 0 0 2.5-2.5v-.628a2.25 2.25 0 1 1 1.5 0V6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-.628A2.25 2.25 0 0 1 1.5 3.25Z"/></svg></div>
+      <div class="feature-content"><strong>CQRS + Projections</strong><span>HR Service writes, Hub Service reads event-sourced projections — independent scaling</span></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 1.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/></svg></div>
+      <div class="feature-content"><strong>Real-Time WebSocket</strong><span>Laravel Reverb broadcasts employee events to connected clients instantly</span></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 5.724V8c0 .248.238.7 1.169 1.159.874.43 2.144.745 3.581.805a.75.75 0 1 1-.064 1.498 12.3 12.3 0 0 1-3.792-.846C2.362 10.111 1 9.227 1 8V4.5c0-1.152 1.263-2.01 2.394-2.516C4.56 1.45 6.142 1 8 1c1.858 0 3.44.45 4.606.984C13.737 2.49 15 3.348 15 4.5V8c0 1.227-1.362 2.111-2.394 2.616A12.3 12.3 0 0 1 9.5 11.464a.75.75 0 0 1-.064-1.498c1.437-.06 2.707-.375 3.581-.806.931-.458 1.169-.91 1.169-1.16V5.724Z"/></svg></div>
+      <div class="feature-content"><strong>Redis Caching</strong><span>Event-driven invalidation with eager rebuild for checklists — ~100% cache hit rate</span></div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-1.042-.018.751.751 0 0 0-.018 1.042L8.31 9.72 7.282 8.69a.75.75 0 0 0-1.06 1.06l1.56 1.56a.749.749 0 0 0 1.06 0l3.94-3.94Z"/></svg></div>
+      <div class="feature-content"><strong>175 Tests Passing</strong><span>Unit, Feature, Integration, Architecture, and Contract test suites via Pest PHP</span></div>
+    </div>
+  </div>
+
+  <h2>Technology Stack</h2>
+  <table>
+    <thead><tr><th>Component</th><th>Technology</th><th>Version</th></tr></thead>
+    <tbody>
+      <tr><td>Language / Framework</td><td>PHP / Laravel</td><td>8.3 / 12.53</td></tr>
+      <tr><td>Database</td><td>PostgreSQL</td><td>16-alpine</td></tr>
+      <tr><td>Message Broker</td><td>RabbitMQ</td><td>3.13-management</td></tr>
+      <tr><td>Cache</td><td>Redis</td><td>7-alpine</td></tr>
+      <tr><td>WebSocket</td><td>Laravel Reverb</td><td>Built-in</td></tr>
+      <tr><td>Metrics</td><td>Prometheus</td><td>latest</td></tr>
+      <tr><td>Dashboards</td><td>Grafana</td><td>v12.4</td></tr>
+      <tr><td>Testing</td><td>Pest PHP</td><td>3.8.5</td></tr>
+      <tr><td>API Docs</td><td>Scramble (OpenAPI)</td><td>dedoc/scramble</td></tr>
+      <tr><td>Container Runtime</td><td>Docker Compose</td><td>Multi-stage</td></tr>
+    </tbody>
+  </table>
+
+  <h2>System Architecture Diagram</h2>
+  <pre class="mermaid">
+graph TB
+    subgraph Docker["Docker Compose Platform"]
+        subgraph HR["HR Service :8001"]
+            HR_API[REST API]
+            HR_DB[(PostgreSQL)]
+        end
+        subgraph Hub["Hub Service :8002"]
+            HUB_API[REST API]
+            HUB_DB[(PostgreSQL)]
+            HUB_CACHE[(Redis Cache)]
+            HUB_WS[Reverb WebSocket :8080]
+        end
+        MQ[RabbitMQ :5672]
+        PROM[Prometheus :9090]
+        GRAF[Grafana :3001]
+    end
+
+    HR_API -->|Publish Events| MQ
+    MQ -->|Consume Events| HUB_API
+    HUB_API --> HUB_CACHE
+    HUB_API --> HUB_WS
+    PROM -->|Scrape /api/metrics| HR_API
+    PROM -->|Scrape /api/metrics| HUB_API
+    GRAF -->|Query| PROM
+
+    style Docker fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style HR fill:#eff6ff,stroke:#3b82f6,color:#1e3a5f
+    style Hub fill:#f0fdf4,stroke:#22c55e,color:#14532d
+  </pre>
+
+  <h2>Service Health</h2>
+  <p>Live deep health check endpoints — database, cache, and message broker status in one call.</p>
+  <div class="dual-code">
+    <div>
+      <div class="code-label">HR Service <code>GET /api/health</code></div>
+      <pre class="code-block"><code>{
+  "status": "ok",
+  "service": "hr-service",
+  "timestamp": "2026-03-07T03:00:48+00:00",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "driver": "pgsql"
+    },
+    "rabbitmq": {
+      "status": "configured"
+    }
+  }
+}</code></pre>
+    </div>
+    <div>
+      <div class="code-label">Hub Service <code>GET /api/health</code></div>
+      <pre class="code-block"><code>{
+  "status": "ok",
+  "service": "hub-service",
+  "timestamp": "2026-03-07T03:00:48+00:00",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "driver": "pgsql"
+    },
+    "cache": {
+      "status": "ok",
+      "store": "redis"
+    },
+    "rabbitmq": {
+      "status": "configured",
+      "host": "rabbitmq"
+    }
+  }
+}</code></pre>
+    </div>
+  </div>

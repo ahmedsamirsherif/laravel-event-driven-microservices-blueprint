@@ -1,0 +1,53 @@
+<h1>Hub Service Blade UI</h1>
+
+  <p>The Hub Service ships a fully interactive server-driven SPA at <code>http://localhost:8002/{country}/{step}</code>. All navigation steps, table columns, form schemas, and dashboard widgets are served by the API — the Blade views contain zero hardcoded country logic.</p>
+
+  <h2>USA Dashboard — Named Employees &amp; Onboarding Checklist</h2>
+  <p>The dashboard lists employees by name with real-time checklist completion progress. Click any row to open a per-employee breakdown modal.</p>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hub-dashboard.png" alt="Hub Service USA dashboard showing named employees (Carlos Mendez, Bob Smith, Christopher White, Dorothy Harris) with checklist progress bars and stat widgets" loading="lazy">
+    <figcaption>USA dashboard — onboarding checklist with employee names and completion rates, followed by stat widgets (Total Employees, Average Salary, Completion Rate). Top-right shows the Live Events panel and the Simulate Event button.</figcaption>
+  </figure>
+
+  <h2>Live Events Panel — Simulate Event</h2>
+  <p>The <strong>▶ Simulate Event</strong> button POSTs a random employee to the HR API, triggering the full pipeline (HR → RabbitMQ → Hub consumer → Redis cache invalidation → WebSocket broadcast). The Live Events panel updates in real time via Laravel Reverb.</p>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hub-events-panel.png" alt="Hub Service dashboard with Live Events panel open showing EmployeeCreated event for Diana Müller triggered by the Simulate Event button" loading="lazy">
+    <figcaption>Live Events panel after clicking ▶ Simulate Event — shows the full event details: employee name, ID, country, event type, and timestamp.</figcaption>
+  </figure>
+
+  <h2>Interactive Checklist Modal — Done &amp; Missing Breakdown</h2>
+  <p>Clicking any employee row opens a modal with a per-step, per-field breakdown: green check for completed fields, amber warning for missing fields with the server-provided validation message.</p>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hub-checklist-modal.png" alt="Checklist modal for Christopher White showing 1 complete (Salary), 2 missing (SSN, Address) — scoring 33% overall" loading="lazy">
+    <figcaption>Checklist modal for Christopher White — Compensation step complete (1/1), Identity &amp; Address step incomplete (0/2). Each missing field shows its validation message and field key badge.</figcaption>
+  </figure>
+
+  <h2>Germany (DEU) — Extra Navigation Step &amp; Goal Tracking</h2>
+  <p>The DEU country module exposes a third navigation step (<strong>Documentation</strong>) absent from USA. The dashboard replaces the Checklist Completion Rate widget with a <strong>Goal Tracking</strong> list showing each employee's career goal.</p>
+  <figure class="screenshot-figure">
+    <img src="screenshots/hub-deu-dashboard.png" alt="Hub Service Germany dashboard showing three sidebar steps (Dashboard, Employees, Documentation), onboarding checklist at top, and Goal Tracking widget listing employee professional goals" loading="lazy">
+    <figcaption>DEU dashboard — sidebar shows three steps (Dashboard, Employees, Documentation). Goal Tracking widget lists each German employee's professional development goal instead of the USA completion rate card.</figcaption>
+  </figure>
+
+  <h2>Germany Documentation Tracking Table</h2>
+  <p>The <strong>Documentation</strong> tab — exclusive to Germany — tracks five compliance document types per employee. Each cell shows <strong>Yes</strong> or <strong>Missing</strong> with an overall docs-completion percentage. This step and its columns are entirely server-driven via <code>DEUModule::navigationSteps()</code>.</p>
+
+  <div class="card" style="margin:0 0 1.25rem">
+    <strong>Document fields tracked for DEU employees</strong>
+    <table style="margin-top:.75rem">
+      <thead><tr><th>Field Key</th><th>Label</th><th>Required by challenge?</th></tr></thead>
+      <tbody>
+        <tr><td><code>doc_work_permit</code></td><td>Work Permit</td><td>No — added beyond challenge spec</td></tr>
+        <tr><td><code>doc_tax_card</code></td><td>Tax Card</td><td>No — added beyond challenge spec</td></tr>
+        <tr><td><code>doc_health_insurance</code></td><td>Health Ins.</td><td>No — added beyond challenge spec</td></tr>
+        <tr><td><code>doc_social_security</code></td><td>Social Sec.</td><td>No — added beyond challenge spec</td></tr>
+        <tr><td><code>doc_employment_contract</code></td><td>Contract</td><td>No — added beyond challenge spec</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="screenshot-figure">
+    <img src="screenshots/hub-deu-documentation.png" alt="DEU Documentation tab table with employees as rows and Work Permit, Tax Card, Health Ins, Social Sec, Contract as columns — each cell shows Yes or Missing with a Docs % summary column" loading="lazy">
+    <figcaption>DEU Documentation tab — tracks five document submission statuses per employee. The Documentation step renders only when the country's steps API includes it, making the tab invisible for USA without any conditional code in the blade.</figcaption>
+  </figure>

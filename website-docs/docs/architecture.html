@@ -1,0 +1,173 @@
+<h1>System Architecture</h1>
+
+  <p>The platform follows <strong>Pragmatic Domain-Driven Design</strong> with a 4-layer architecture. Each microservice maintains its own database and communicates exclusively through events.</p>
+
+  <h2>High-Level Service Topology</h2>
+  <p>The platform is easiest to read as four lanes: a <strong>write side</strong> that validates and persists employees, an <strong>event backbone</strong> that decouples services, a <strong>read side</strong> that serves projections and realtime updates, and an <strong>observability layer</strong> that monitors the whole system.</p>
+
+  <pre class="mermaid">
+graph LR
+    Client([Client Apps])
+
+    subgraph Write["Write Path"]
+        direction LR
+        HR["HR Service<br/>CRUD + country validation<br/>Port 8001"]
+        HRDB[("HR PostgreSQL<br/>source of truth")]
+        RMQ{{"RabbitMQ<br/>employee_events topic"}}
+
+        HR -->|Persist employee data| HRDB
+        HR -->|Publish employee.* events| RMQ
+    end
+
+    subgraph Read["Projection & Read Path"]
+        direction LR
+        Consumer["Hub Consumer<br/>projection worker"]
+        HubState[("Hub PostgreSQL + Redis<br/>projections and cache")]
+        Hub["Hub Service<br/>read APIs + server-driven UI<br/>Port 8002"]
+        Reverb["Reverb<br/>WebSocket 8080"]
+
+        Consumer -->|Upsert + invalidate cache| HubState
+        Hub -->|Read projections + cached views| HubState
+        Consumer -->|Broadcast updates| Reverb
+    end
+
+    subgraph Observe["Observability"]
+        direction LR
+        Prom["Prometheus<br/>metrics scraping"]
+        Grafana["Grafana<br/>dashboards"]
+
+        Grafana -->|Visualize metrics| Prom
+    end
+
+    Client -->|REST write| HR
+    Client -->|REST read| Hub
+    Client -->|Realtime subscribe| Reverb
+    RMQ -->|Consume employee.#| Consumer
+    Prom -->|Scrape /api/metrics| HR
+    Prom -->|Scrape /api/metrics| Hub
+    Prom -->|Scrape /metrics| RMQ
+  </pre>
+
+  <div class="callout">
+    The diagram stays intentionally high level. The detailed operational responsibilities sit below so the Mermaid stays readable at normal page width instead of forcing every service concern into tiny nodes.
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <strong>Write Side</strong>
+      <span>HR Service validates country-specific fields, persists employees, and emits lifecycle events.</span>
+    </div>
+    <div class="card">
+      <strong>Event Backbone</strong>
+      <span>RabbitMQ carries <code>employee.*</code> messages so the write model and read model stay independently deployable.</span>
+    </div>
+    <div class="card">
+      <strong>Read Experience</strong>
+      <span>Hub Consumer builds projections, Redis keeps responses fast, and Reverb pushes changes to connected clients.</span>
+    </div>
+    <div class="card">
+      <strong>Observability</strong>
+      <span>Prometheus scrapes service and broker metrics, while Grafana turns them into operational dashboards.</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Primary responsibility</th>
+        <th>Interfaces</th>
+        <th>State / output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>HR Service</td>
+        <td>Command-side API, country validation, event publication</td>
+        <td>REST on <code>8001</code>, AMQP publish</td>
+        <td>HR PostgreSQL, employee lifecycle events</td>
+      </tr>
+      <tr>
+        <td>RabbitMQ + Hub Consumer</td>
+        <td>Asynchronous delivery, retries, idempotent projection updates</td>
+        <td>AMQP topic exchange and durable queue</td>
+        <td>Queued events, processed projection work</td>
+      </tr>
+      <tr>
+        <td>Hub Service</td>
+        <td>Query-side APIs and server-driven UI responses</td>
+        <td>REST on <code>8002</code></td>
+        <td>Read models, checklist responses, UI schema</td>
+      </tr>
+      <tr>
+        <td>Redis + Reverb</td>
+        <td>Fast cached reads and realtime fan-out</td>
+        <td>Cache store, WebSocket on <code>8080</code></td>
+        <td>Warm cache entries, employee update broadcasts</td>
+      </tr>
+      <tr>
+        <td>Prometheus + Grafana</td>
+        <td>Metrics collection, dashboarding, operational visibility</td>
+        <td>Scrape endpoints, Grafana queries</td>
+        <td>Time-series metrics, dashboards, alerts</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>DDD Layer Structure</h2>
+  <pre class="mermaid">
+graph TD
+    subgraph HTTP["HTTP Layer"]
+        Controllers
+        Requests["Form Requests"]
+        Resources["API Resources"]
+        Middleware
+    end
+
+    subgraph Application["Application Layer"]
+        Actions["Actions / Use Cases"]
+        Listeners["Event Listeners"]
+        Handlers["Event Handlers"]
+        Pipeline["Processing Pipeline"]
+    end
+
+    subgraph Domain["Domain Layer"]
+        Models["Eloquent Models"]
+        Events["Domain Events"]
+        DTOs["Data Transfer Objects"]
+        VOs["Value Objects"]
+        Repos["Repository Interfaces"]
+        Country["Country Contracts"]
+    end
+
+    subgraph Infra["Infrastructure Layer"]
+        EloquentRepos["Eloquent Repositories"]
+        Messaging["RabbitMQ Publisher/Consumer"]
+        Cache["Cache Managers"]
+        Broadcasting["WebSocket Broadcasting"]
+        Metrics["Prometheus Metrics"]
+        CountryResolver["Country Class Resolver"]
+    end
+
+    HTTP --> Application
+    Application --> Domain
+    Infra --> Domain
+
+    style HTTP fill:#ddf4ff,stroke:#0969da,color:#1f2328
+    style Application fill:#fff8c5,stroke:#9a6700,color:#1f2328
+    style Domain fill:#dafbe1,stroke:#1a7f37,color:#1f2328
+    style Infra fill:#ffebe9,stroke:#cf222e,color:#1f2328
+  </pre>
+
+  <h2>Architecture Rules</h2>
+  <div class="callout">
+    These rules are enforced by Pest Architecture tests and verified on every CI run.
+  </div>
+  <ul>
+    <li><strong>Domain</strong> does NOT depend on Infrastructure or HTTP layers</li>
+    <li>DTOs and Value Objects are <strong>readonly</strong></li>
+    <li>Actions and Pipelines are <strong>final</strong> classes</li>
+    <li>Domain events do NOT implement <code>ShouldBroadcast</code></li>
+    <li>Repository interfaces live in Domain, implementations in Infrastructure</li>
+    <li>No debug functions (<code>dd</code>, <code>dump</code>, <code>var_dump</code>) in codebase</li>
+  </ul>

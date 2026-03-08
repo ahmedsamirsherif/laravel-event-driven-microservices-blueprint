@@ -1,0 +1,269 @@
+<h1>Why DDD?</h1>
+  <p>This platform uses <strong>Pragmatic Domain-Driven Design</strong> instead of the conventional Laravel MVC approach. This page explains the reasoning, the trade-offs, and what each layer provides compared to the default Laravel structure.</p>
+
+  <hr>
+
+  <h2>The Problem with Default Laravel Structure</h2>
+  <p>Laravel's default directory layout groups code by <em>technical role</em> — controllers in one folder, models in another, requests in a third. This works well for small applications, but as a system grows the boundaries blur:</p>
+
+  <table>
+    <thead><tr><th>Concern</th><th>Default Laravel</th><th>What Goes Wrong at Scale</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Business logic location</td>
+        <td>Controllers, Models, or "Service" classes</td>
+        <td>Logic scatters across layers. A single business rule might live in a controller, a model accessor, and a form request simultaneously.</td>
+      </tr>
+      <tr>
+        <td>Model responsibilities</td>
+        <td>Eloquent Models handle persistence, validation, relationships, scopes, accessors, and domain logic</td>
+        <td>Models become "God Objects" — 500+ line files that do everything. Testing any single behavior requires setting up the entire ORM.</td>
+      </tr>
+      <tr>
+        <td>Cross-service contracts</td>
+        <td>No convention</td>
+        <td>When two services need to agree on a data shape, there's nothing guiding where the contract lives or how it's enforced.</td>
+      </tr>
+      <tr>
+        <td>Country-specific rules</td>
+        <td>Typically <code>if/else</code> chains or <code>switch</code> statements in controllers</td>
+        <td>Adding a country means modifying existing code in multiple places — violating Open/Closed Principle.</td>
+      </tr>
+      <tr>
+        <td>Testability</td>
+        <td>Feature tests that boot the entire framework</td>
+        <td>Slow test suites. Can't test a business rule without a database connection.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>What DDD Gives This Platform</h2>
+  <p>DDD organizes code by <em>business concept</em> first, <strong>technical role</strong> second. Each layer has a clear responsibility and dependency direction:</p>
+
+  <pre class="mermaid">
+graph TD
+    HTTP["HTTP Layer<br/><small>Controllers · Requests · Resources · Middleware</small>"]
+    APP["Application Layer<br/><small>Actions · Listeners · Pipeline · Handlers</small>"]
+    DOM["Domain Layer<br/><small>Models · Events · DTOs · Value Objects · Interfaces</small>"]
+    INF["Infrastructure Layer<br/><small>RabbitMQ · Redis · Repositories · Broadcasting</small>"]
+
+    HTTP --> APP
+    APP --> DOM
+    INF --> DOM
+
+    style DOM fill:#347d39,color:#fff,stroke:none
+    style APP fill:#1a7f37,color:#fff,stroke:none
+    style HTTP fill:#0969da,color:#fff,stroke:none
+    style INF fill:#8250df,color:#fff,stroke:none
+  </pre>
+
+  <p>The arrow direction is critical: <strong>Domain depends on nothing</strong>. Everything else depends on Domain. This means business rules are isolated, testable, and portable.</p>
+
+  <h2>Layer-by-Layer — What Lives Where</h2>
+
+  <h3>Domain Layer</h3>
+  <p>Pure business logic. No framework imports, no database queries, no HTTP concerns.</p>
+  <table>
+    <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Models</td><td>Business entities with their invariants</td><td><code>Employee</code> — fillable fields, casts</td></tr>
+      <tr><td>Events</td><td>Things that happened in the domain</td><td><code>EmployeeCreated</code>, <code>EmployeeUpdated</code>, <code>EmployeeDeleted</code></td></tr>
+      <tr><td>Value Objects</td><td>Immutable, self-validating types</td><td><code>SSN</code> (validates <code>^\d{3}-\d{2}-\d{4}$</code>), <code>TaxId</code> (validates <code>^DE\d{9}$</code>), <code>Salary</code> (enforces <code>&gt;= 0</code>)</td></tr>
+      <tr><td>DTOs</td><td>Typed data bags for crossing layer boundaries</td><td><code>CreateEmployeeDTO</code>, <code>UpdateEmployeeDTO</code> (both <code>readonly</code>)</td></tr>
+      <tr><td>Repository Interfaces</td><td>Contracts for data access (not implementations)</td><td><code>EmployeeRepositoryInterface</code> — <code>create()</code>, <code>update()</code>, <code>delete()</code>, <code>findOrFail()</code></td></tr>
+      <tr><td>Country Contracts</td><td>Extension point for country-specific behavior</td><td><code>CountryFieldsInterface</code> (HR), <code>CountryModuleInterface</code> (Hub)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Application Layer</h3>
+  <p>Orchestrates domain objects to fulfill use cases. Thin — no business rules here, just coordination.</p>
+  <table>
+    <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Actions</td><td>Single-responsibility use cases</td><td><code>CreateEmployeeAction</code> — calls repository, dispatches domain event</td></tr>
+      <tr><td>Listeners</td><td>React to domain events</td><td><code>PublishEmployeeEventToRabbitMQ</code> — builds payload from domain event, delegates to publisher</td></tr>
+      <tr><td>Pipeline</td><td>Multi-step event processing</td><td><code>EventProcessingPipeline</code> — idempotency, logging, handler dispatch, completion marking</td></tr>
+      <tr><td>Handlers</td><td>Process specific event types</td><td><code>EmployeeCreatedHandler</code> — upserts projection, invalidates cache</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Infrastructure Layer</h3>
+  <p>Implements domain interfaces with concrete technology. Swappable without touching business logic.</p>
+  <table>
+    <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Repositories</td><td>Concrete data access</td><td><code>EloquentEmployeeRepository</code> implements <code>EmployeeRepositoryInterface</code></td></tr>
+      <tr><td>Messaging</td><td>AMQP transport</td><td><code>RabbitMQPublisher</code>, <code>RabbitMQConsumer</code></td></tr>
+      <tr><td>Cache</td><td>Cache management</td><td><code>EmployeeCacheManager</code>, <code>ChecklistCacheManager</code></td></tr>
+      <tr><td>Broadcasting</td><td>WebSocket events</td><td><code>EmployeeUpdatedBroadcast</code> (Reverb)</td></tr>
+      <tr><td>Country Resolution</td><td>Auto-discovery of country modules</td><td><code>CountryClassResolver</code>, <code>CountryRegistry</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>HTTP Layer</h3>
+  <p>Thin translation layer. Validates input, calls an Action, formats the response. Zero business logic.</p>
+  <table>
+    <thead><tr><th>Component</th><th>Purpose</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Controllers</td><td>Receive HTTP, delegate to Actions</td><td><code>EmployeeController::store()</code> — validates via FormRequest, calls <code>CreateEmployeeAction</code>, returns Resource</td></tr>
+      <tr><td>Form Requests</td><td>Input validation</td><td><code>StoreEmployeeRequest</code> — dynamically merges country-specific rules</td></tr>
+      <tr><td>Resources</td><td>Response formatting</td><td><code>EmployeeResource</code> — transforms model to API response</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Side-by-Side Comparison</h2>
+  <p>How the same "create employee" operation looks in each approach:</p>
+
+  <h3>Traditional Laravel</h3>
+  <pre><code>// EmployeeController.php — everything in one place
+public function store(Request $request)
+{
+    $request->validate([...]);                          // validation
+    $employee = Employee::create($request->all());      // persistence
+    if ($employee->country === 'USA') { ... }           // business logic
+    event(new EmployeeCreated($employee));              // side effects
+    Cache::forget('employees');                         // infrastructure
+    return response()->json($employee, 201);            // presentation
+}</code></pre>
+
+  <h3>DDD Layered Approach (This Platform)</h3>
+  <pre><code>// HTTP: StoreEmployeeRequest handles validation (with country-specific rules from registry)
+// HTTP: EmployeeController delegates to Action
+public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
+{
+    $dto = CreateEmployeeDTO::from($request->validated());
+    $employee = $action->execute($dto);
+    return new EmployeeResource($employee);
+}
+
+// Application: CreateEmployeeAction — one job
+public function execute(CreateEmployeeDTO $dto): Employee
+{
+    $employee = $this->repository->create($dto);        // uses interface, not Eloquent directly
+    Event::dispatch(new EmployeeCreated($employee));     // domain event (no side effects here)
+    return $employee;
+}
+
+// Application: Listener reacts to event — separate concern
+// PublishEmployeeEventToRabbitMQ builds payload, publishes via RabbitMQPublisher
+
+// Infrastructure: EloquentEmployeeRepository implements the interface
+// Infrastructure: RabbitMQPublisher handles AMQP transport
+// Infrastructure: Cache invalidation handled by event handlers in Hub Service</code></pre>
+
+  <h2>Why This Matters for a Multi-Country Platform</h2>
+
+  <h3>1. Country Extensibility — Open/Closed Principle</h3>
+  <p>Adding a new country (e.g., France) requires <strong>zero modifications to existing code</strong>:</p>
+  <ul>
+    <li>HR Service: Create <code>app/Domain/Country/FRA/FRAFields.php</code> implementing <code>CountryFieldsInterface</code></li>
+    <li>Hub Service: Create <code>app/Domain/Country/FRA/FRAModule.php</code> implementing <code>CountryModuleInterface</code></li>
+    <li><code>CountryClassResolver</code> auto-discovers it by convention — no manual registration</li>
+  </ul>
+  <p>In traditional Laravel, this would mean editing controllers, validation logic, form requests, and view logic across multiple files.</p>
+
+  <h3>2. Two Services, One Domain Language</h3>
+  <p>Both HR and Hub services share the same domain vocabulary (<code>Employee</code>, <code>CountryCode</code>, domain events) while having completely independent infrastructure. DDD makes this boundary explicit — the domain is portable, the infrastructure is swappable.</p>
+
+  <h3>3. Event-Driven Architecture Requires Clear Boundaries</h3>
+  <p>When services communicate through events:</p>
+  <ul>
+    <li><strong>Domain events</strong> (<code>EmployeeCreated</code>) are plain DTOs that carry only domain data — no framework coupling</li>
+    <li><strong>Listeners</strong> in the Application layer translate domain events to infrastructure actions (publish to RabbitMQ)</li>
+    <li><strong>Broadcast events</strong> (<code>EmployeeUpdatedBroadcast</code>) live in Infrastructure — they're a delivery mechanism, not a business concept</li>
+  </ul>
+  <p>Without DDD layers, domain events and broadcast events get mixed together. The architecture tests enforce this separation:</p>
+  <pre><code>// Pest Architecture Test — enforced rule
+test('domain events do not implement ShouldBroadcast')
+    ->expect('App\Domain')
+    ->not->toImplement(ShouldBroadcast::class);</code></pre>
+
+  <h3>4. Testability</h3>
+  <table>
+    <thead><tr><th>Test Type</th><th>What It Tests</th><th>Dependencies</th></tr></thead>
+    <tbody>
+      <tr><td>Unit (Domain)</td><td>Value Objects, DTOs, domain logic</td><td>None — pure PHP</td></tr>
+      <tr><td>Unit (Application)</td><td>Actions, Handlers, Pipeline</td><td>Mocked interfaces only</td></tr>
+      <tr><td>Feature</td><td>Full HTTP cycle</td><td>PostgreSQL (test DB)</td></tr>
+      <tr><td>Architecture</td><td>Layer dependency rules</td><td>None — static analysis</td></tr>
+      <tr><td>Contract</td><td>Event schema compliance</td><td>None — JSON Schema validation</td></tr>
+    </tbody>
+  </table>
+  <p>Domain value objects like <code>SSN</code> and <code>TaxId</code> are tested in complete isolation — no database, no framework boot, no HTTP stack. This keeps the unit test suite fast and focused.</p>
+
+  <h2>Pragmatic, Not Purist</h2>
+  <p>This is <strong>Pragmatic DDD</strong> — not a textbook implementation. Key compromises made for Laravel compatibility:</p>
+  <table>
+    <thead><tr><th>Pure DDD Would...</th><th>This Platform Does...</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Ban Eloquent from Domain layer</td>
+        <td>Allows Eloquent Models in Domain</td>
+        <td>Fighting Laravel's ORM creates unnecessary friction. Models are the domain entities — forcing a separate "pure" entity plus a mapper adds code without adding clarity. See <a href="#deviations">ADR-003</a>.</td>
+      </tr>
+      <tr>
+        <td>Use Domain Services for all orchestration</td>
+        <td>Uses Action classes (single-responsibility)</td>
+        <td>Actions are simpler, more testable, and align with Laravel conventions. Each Action does exactly one thing.</td>
+      </tr>
+      <tr>
+        <td>Implement Aggregates with consistency boundaries</td>
+        <td>Uses simple Eloquent Models as aggregates</td>
+        <td>The Employee entity doesn't have complex sub-entity relationships that warrant aggregate pattern overhead.</td>
+      </tr>
+      <tr>
+        <td>Abstract all infrastructure behind interfaces</td>
+        <td>Some infrastructure classes injected directly</td>
+        <td>Cache managers and metrics services are unlikely to be swapped. Interfaces where they add value (repositories), direct injection where they don't.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Directory Comparison</h2>
+  <table>
+    <thead><tr><th>Default Laravel</th><th>DDD Layered (This Platform)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><pre>app/
+├── Http/Controllers/
+├── Models/
+├── Events/
+├── Listeners/
+├── Jobs/
+├── Mail/
+├── Notifications/
+├── Policies/
+├── Providers/
+└── Services/</pre></td>
+        <td><pre>app/
+├── Domain/
+│   ├── Employee/
+│   │   ├── Models/
+│   │   ├── Events/
+│   │   ├── DTOs/
+│   │   ├── ValueObjects/
+│   │   └── Repositories/
+│   ├── Country/
+│   │   ├── Contracts/
+│   │   ├── Shared/
+│   │   ├── USA/
+│   │   └── DEU/
+│   └── Shared/Enums/
+├── Application/
+│   └── Employee/
+│       ├── Actions/
+│       ├── Listeners/
+│       └── Handlers/
+├── Infrastructure/
+│   ├── Repositories/
+│   ├── Messaging/
+│   ├── Cache/
+│   └── Broadcasting/
+└── Http/
+    ├── Controllers/
+    ├── Requests/
+    └── Resources/</pre></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>The DDD structure makes the domain visible at the folder level. Opening <code>Domain/Country/</code> immediately tells you the system handles multiple countries. Opening <code>Domain/Employee/ValueObjects/</code> tells you SSN and TaxId have validation rules. The structure communicates intent.</p>

@@ -1,0 +1,36 @@
+<h1>Country Modules</h1>
+
+  <p>The platform uses an <strong>auto-discovering convention-based architecture</strong>. Adding a new country requires zero changes to existing code — just create files in the right directories.</p>
+
+  <h2>Supported Countries</h2>
+  <div class="card-grid">
+    <div class="card">
+      <strong>🇺🇸 USA</strong>
+      <span>SSN + Address required</span>
+      <span style="font-size:.78rem;color:var(--text-tertiary)">2 extra fields, 3 checklist steps</span>
+    </div>
+    <div class="card">
+      <strong>🇩🇪 DEU (Germany)</strong>
+      <span>Tax ID + Goal required</span>
+      <span style="font-size:.78rem;color:var(--text-tertiary)">2 extra fields, 3 checklist steps</span>
+    </div>
+  </div>
+
+  <h2>Auto-Discovery Flow</h2>
+  <pre class="mermaid">
+graph LR
+    Scanner["CountryClassResolver"] -->|Scan Domain/Country/*/| Dir["Discover Directories"]
+    Dir -->|Skip Contracts, Shared| Class["Build FQCN:<br/>{ISO3}{Suffix}"]
+    Class -->|Reflection Check| Interface{"Implements<br/>Interface?"}
+    Interface -->|Yes| Register["Register in Registry"]
+    Interface -->|No| Skip["Skip"]
+  </pre>
+
+  <h2>Adding a New Country</h2>
+  <ol>
+    <li>Add case to <code>CountryCode</code> enum (both services)</li>
+    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Fields.php</code> implementing <code>CountryFieldsInterface</code> (HR)</li>
+    <li>Create <code>Domain/Country/{ISO3}/{ISO3}Module.php</code> implementing <code>CountryModuleInterface</code> (Hub)</li>
+    <li>Update event schema contract (if new fields)</li>
+    <li>Add tests — done!</li>
+  </ol>

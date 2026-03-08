@@ -1,0 +1,101 @@
+<h1>Country Resolver Lifecycle</h1>
+
+<p>This page focuses on the exact runtime path that reaches the country-specific validation modules in the HR service. The key point is that the registry is <strong>bound during boot</strong> but only <strong>discovered lazily</strong> when request validation asks for it.</p>
+
+<div class="callout">
+  <strong>Registry vs resolver:</strong> <code>CountryFieldsRegistry</code> is the container-facing registry used by the request layer. It delegates discovery to <code>CountryClassResolver</code>, which scans <code>Domain/Country/*</code> and instantiates matching classes.
+</div>
+
+<h2>Request to Registry Trigger</h2>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Nginx
+    participant Index as public/index.php
+    participant Boot as bootstrap/app.php
+    participant Laravel as Laravel Application
+    participant Provider as AppServiceProvider
+    participant Router
+    participant Request as StoreEmployeeRequest
+    participant Container as Service Container
+    participant Registry as CountryFieldsRegistry
+    participant Resolver as CountryClassResolver
+    participant Modules as Domain/Country/*/*Fields
+    participant Controller as EmployeeController@store
+
+    Client->>Nginx: POST /api/v1/employees
+    Nginx->>Index: Forward request
+    Index->>Index: Load Composer autoload
+    Index->>Boot: Bootstrap application
+    Boot-->>Index: Application instance
+    Index->>Laravel: Handle request
+
+    Laravel->>Provider: Boot service providers
+    Provider->>Container: Bind CountryFieldsRegistry singleton
+    Note over Provider,Container: Binding happens during boot.<br/>Discovery has not happened yet.
+
+    Laravel->>Router: Match API route
+    Router-->>Laravel: EmployeeController@store
+    Laravel->>Request: Resolve FormRequest
+    Request->>Request: authorize()
+    Request->>Request: rules()
+    Request->>Container: app(CountryFieldsRegistry::class)
+
+    alt First resolution in this request lifecycle
+        Container->>Registry: discover()
+        Registry->>Resolver: discoverAll("Fields", CountryFieldsInterface::class)
+        Resolver->>Modules: Scan Domain/Country/*
+        Modules-->>Resolver: USAFields, DEUFields, ...
+        Resolver-->>Registry: Country modules map
+        Registry-->>Container: Registry instance
+    else Singleton already resolved
+        Container-->>Request: Existing registry instance
+    end
+
+    Container-->>Request: CountryFieldsRegistry
+    Request->>Registry: supportedCountries()
+    Request->>Registry: supports(country)
+    Request->>Registry: for(country)
+    Registry-->>Request: CountryFieldsInterface implementation
+    Request->>Request: Merge base rules + country rules
+    Request-->>Laravel: Final validation rules
+
+    alt Validation passes
+        Laravel->>Controller: store()
+    else Validation fails
+        Laravel-->>Client: 422 validation response
+    end
+</pre>
+
+<h2>What Actually Triggers It</h2>
+<ol>
+  <li>The registry is registered in the container by <code>AppServiceProvider</code>.</li>
+  <li>The HTTP route resolves <code>StoreEmployeeRequest</code> before the controller action executes.</li>
+  <li><code>StoreEmployeeRequest::rules()</code> calls <code>app(CountryFieldsRegistry::class)</code>.</li>
+  <li>That first container resolution runs <code>CountryFieldsRegistry::discover()</code>.</li>
+  <li>The registry uses <code>CountryClassResolver::discoverAll()</code> to build the country map.</li>
+  <li>The request then asks the registry for the selected country and merges its validation rules.</li>
+</ol>
+
+<h2>Why This Matters</h2>
+<div class="card-grid">
+  <div class="card">
+    <strong>Lazy Discovery</strong>
+    <span>No scan runs unless a request path actually needs country-specific behavior.</span>
+  </div>
+  <div class="card">
+    <strong>Zero Manual Registration</strong>
+    <span>Adding a new country means adding the convention-matching class, not updating a switch or service map.</span>
+  </div>
+  <div class="card">
+    <strong>Request-Time Validation</strong>
+    <span>The selected country determines the extra rules only when request data is available.</span>
+  </div>
+</div>
+
+<h2>Related Pages</h2>
+<ul>
+  <li><strong>Countries</strong> covers the high-level auto-discovery model and how to add a new country.</li>
+  <li><strong>System Architecture</strong> shows where the resolver sits in the infrastructure layer.</li>
+</ul>

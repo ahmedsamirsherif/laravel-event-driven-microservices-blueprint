@@ -1,0 +1,202 @@
+<h1>Logging</h1>
+  <p>Both services use Laravel's logging system with <strong>structured context</strong> and <strong>stderr output</strong> for Docker-native log aggregation.</p>
+
+  <hr>
+
+  <h2>Configuration</h2>
+  <table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Channel</td><td><code>stderr</code></td><td><code>LOG_CHANNEL</code> env var in <code>docker-compose.yml</code></td></tr>
+      <tr><td>Level</td><td><code>debug</code></td><td><code>LOG_LEVEL</code> env var in <code>docker-compose.yml</code></td></tr>
+      <tr><td>Driver</td><td><code>monolog</code> with <code>StreamHandler</code> → <code>php://stderr</code></td><td><code>config/logging.php</code> → <code>stderr</code> channel</td></tr>
+      <tr><td>Format</td><td>Laravel default (timestamp + channel + level + message + context JSON)</td><td>Monolog default formatter</td></tr>
+    </tbody>
+  </table>
+  <p>All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures. Logs are accessible via:</p>
+  <pre><code>docker compose logs hr-service        # HR logs
+docker compose logs hub-consumer      # Consumer pipeline logs
+docker compose logs -f                # Follow all services</code></pre>
+
+  <h2>Available Channels</h2>
+  <p>Both services define these channels in <code>config/logging.php</code>. Only <code>stderr</code> is active in Docker:</p>
+  <table>
+    <thead><tr><th>Channel</th><th>Driver</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td><code>stack</code></td><td>Stack</td><td>Combines multiple channels</td></tr>
+      <tr><td><code>single</code></td><td>Monolog</td><td><code>storage/logs/laravel.log</code></td></tr>
+      <tr><td><code>daily</code></td><td>Monolog</td><td>Rolling daily log files</td></tr>
+      <tr><td><code>stderr</code></td><td>Monolog</td><td><code>php://stderr</code> (active)</td></tr>
+      <tr><td><code>syslog</code></td><td>Syslog</td><td>System log</td></tr>
+      <tr><td><code>errorlog</code></td><td>Error log</td><td>PHP <code>error_log()</code></td></tr>
+      <tr><td><code>null</code></td><td>Monolog</td><td>No output (discard)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Request ID Context</h2>
+  <p>Both services inject a <code>request_id</code> into every log entry via the <code>AddRequestId</code> middleware:</p>
+  <pre><code>// AddRequestId middleware — runs on every API request
+$requestId = $request->header('X-Request-ID') ?? (string) Str::uuid();
+Log::withContext(['request_id' => $requestId]);</code></pre>
+  <p>This means every log line produced during a request carries the same <code>request_id</code>, enabling end-to-end tracing. The ID is also returned in the response header <code>X-Request-ID</code>.</p>
+
+  <h2>Log Levels Used</h2>
+  <table>
+    <thead><tr><th>Level</th><th>Count</th><th>When Used</th></tr></thead>
+    <tbody>
+      <tr><td><code>error</code></td><td>6</td><td>Unrecoverable failures — event publish failure, message processing failure, unhandled exceptions</td></tr>
+      <tr><td><code>warning</code></td><td>9</td><td>Degraded but recoverable — metrics recording failure, no handler for event, broadcast failure (non-fatal), DLQ routing, health check degraded</td></tr>
+      <tr><td><code>info</code></td><td>29</td><td>Operational events — employee CRUD, event published/processed, consumer start/stop, handler execution, broadcast sent, retry/requeue, signal received</td></tr>
+      <tr><td><code>debug</code></td><td>2</td><td>Verbose tracing — employee list served, checklist served (Hub only)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>HR Service — Log Points</h2>
+
+  <h3>Controllers</h3>
+  <table>
+    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee created</td><td><code>employee_id</code>, <code>country</code></td></tr>
+      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee updated</td><td><code>employee_id</code>, <code>country</code>, <code>changed_fields</code></td></tr>
+      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee deleted</td><td><code>employee_id</code>, <code>country</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Event Publishing</h3>
+  <table>
+    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>RabbitMQPublisher</code></td><td><code>info</code></td><td>Event published</td><td><code>routing_key</code>, <code>event_id</code></td></tr>
+      <tr><td><code>RabbitMQPublisher</code></td><td><code>error</code></td><td>Failed to publish event</td><td><code>routing_key</code>, <code>event_id</code>, <code>error</code></td></tr>
+      <tr><td><code>PublishEmployeeEventToRabbitMQ</code></td><td><code>error</code></td><td>Failed to publish employee event</td><td><code>event_type</code>, <code>employee_id</code>, <code>error</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Middleware &amp; Exceptions</h3>
+  <table>
+    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>AddRequestId</code></td><td>context</td><td><em>(sets request_id on all logs)</em></td><td><code>request_id</code></td></tr>
+      <tr><td><code>RecordRequestMetrics</code></td><td><code>warning</code></td><td>Request metrics recording failed</td><td><code>method</code>, <code>endpoint</code>, <code>status</code>, <code>error</code></td></tr>
+      <tr><td><code>Handler</code></td><td><code>error</code></td><td>Unhandled exception</td><td><code>exception</code> (class name), <code>message</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Hub Service — Log Points</h2>
+
+  <h3>Consumer Lifecycle</h3>
+  <table>
+    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>info</code></td><td>RabbitMQ consumer started</td><td><code>queue</code></td></tr>
+      <tr><td><code>info</code></td><td>RabbitMQ consumer stopped gracefully</td><td>—</td></tr>
+      <tr><td><code>info</code></td><td>Received SIGTERM - stopping consumer gracefully</td><td>—</td></tr>
+      <tr><td><code>info</code></td><td>Received SIGINT - stopping consumer gracefully</td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Event Processing Pipeline</h3>
+  <table>
+    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>info</code></td><td>Duplicate event skipped</td><td><code>event_id</code>, <code>event_type</code></td></tr>
+      <tr><td><code>info</code></td><td>Dispatching to handler</td><td><code>handler</code> (class name), <code>event_type</code></td></tr>
+      <tr><td><code>warning</code></td><td>No handler for event</td><td><code>event_type</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Event Handlers</h3>
+  <table>
+    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>info</code></td><td>EmployeeCreated handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
+      <tr><td><code>info</code></td><td>EmployeeUpdated handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
+      <tr><td><code>info</code></td><td>EmployeeDeleted handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Message Processing &amp; Retries</h3>
+  <table>
+    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>info</code></td><td>Event fully processed</td><td><code>event_type</code>, <code>employee_id</code>, <code>country</code>, <code>duration_ms</code>, <code>retry_count</code></td></tr>
+      <tr><td><code>error</code></td><td>Failed to process RabbitMQ message</td><td><code>event_type</code>, <code>retry_count</code>, <code>error</code></td></tr>
+      <tr><td><code>info</code></td><td>Message re-queued for retry</td><td><code>retry_count</code>, <code>delay_ms</code></td></tr>
+      <tr><td><code>warning</code></td><td>Message exhausted retries, sending to DLQ</td><td><code>event_type</code>, <code>retry_count</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Broadcasting</h3>
+  <table>
+    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>info</code></td><td>Broadcast sent via Reverb</td><td><code>event_type</code>, <code>employee_id</code>, <code>country</code>, <code>channels</code></td></tr>
+      <tr><td><code>warning</code></td><td>Broadcast to Reverb failed (non-fatal)</td><td><code>event_type</code>, <code>error</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Controllers &amp; Health</h3>
+  <table>
+    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><code>EmployeeController</code></td><td><code>debug</code></td><td>Employee list served</td><td><code>country</code></td></tr>
+      <tr><td><code>ChecklistController</code></td><td><code>debug</code></td><td>Checklist served</td><td><code>country</code></td></tr>
+      <tr><td><code>HealthController</code></td><td><code>warning</code></td><td>Hub service health check degraded</td><td><code>checks</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Exception Handling</h2>
+  <p>Both services use a custom <code>Handler</code> in <code>app/Exceptions/Handler.php</code>:</p>
+  <pre><code>$this->renderable(function (Throwable $e) {
+    Log::error('Unhandled exception', [
+        'exception' => get_class($e),
+        'message'   => $e->getMessage(),
+    ]);
+    // Returns standardized JSON error envelope
+});</code></pre>
+  <p>This catches all unhandled exceptions, logs them at <code>error</code> level, and returns a consistent JSON response with the error code and message.</p>
+
+  <h2>Event Pipeline Log Trace</h2>
+  <p>A successful employee creation produces this log sequence across services:</p>
+  <pre><code># HR Service (hr-service container)
+[INFO] Employee created                  {"employee_id":1,"country":"USA","request_id":"abc-123"}
+[INFO] Event published                   {"routing_key":"employee.created.usa","event_id":"evt-456","request_id":"abc-123"}
+
+# Hub Service (hub-consumer container)
+[INFO] Dispatching to handler            {"handler":"EmployeeCreatedHandler","event_type":"EmployeeCreated"}
+[INFO] EmployeeCreated handled           {"employee_id":1,"country":"USA"}
+[INFO] Broadcast sent via Reverb         {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","channels":["employees","country.USA","checklist.USA"]}
+[INFO] Event fully processed             {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","duration_ms":45,"retry_count":0}</code></pre>
+
+  <h2>Failed Event Log Trace</h2>
+  <p>When processing fails and retries exhaust:</p>
+  <pre><code># Attempt 1
+[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":0,"error":"Connection refused"}
+[INFO]  Message re-queued for retry         {"retry_count":1,"delay_ms":1000}
+
+# Attempt 2
+[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":1,"error":"Connection refused"}
+[INFO]  Message re-queued for retry         {"retry_count":2,"delay_ms":2000}
+
+# Attempt 3
+[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":2,"error":"Connection refused"}
+[INFO]  Message re-queued for retry         {"retry_count":3,"delay_ms":4000}
+
+# Attempt 4 — max retries exceeded
+[ERROR]   Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":3,"error":"Connection refused"}
+[WARNING] Message exhausted retries, sending to DLQ  {"event_type":"EmployeeCreated","retry_count":3}</code></pre>
+
+  <h2>Accessing Logs</h2>
+  <table>
+    <thead><tr><th>Command</th><th>What It Shows</th></tr></thead>
+    <tbody>
+      <tr><td><code>docker compose logs hr-service</code></td><td>HR API logs (CRUD operations, event publishing)</td></tr>
+      <tr><td><code>docker compose logs hub-service</code></td><td>Hub API logs (employee list, checklist, schema endpoints)</td></tr>
+      <tr><td><code>docker compose logs hub-consumer</code></td><td>Event pipeline logs (processing, handlers, retries, broadcasts)</td></tr>
+      <tr><td><code>docker compose logs reverb</code></td><td>WebSocket server logs</td></tr>
+      <tr><td><code>docker compose logs -f</code></td><td>Follow all service logs in real-time</td></tr>
+      <tr><td><code>docker compose logs hub-consumer 2>&amp;1 | grep ERROR</code></td><td>Filter for errors only</td></tr>
+      <tr><td><code>docker compose logs hub-consumer 2>&amp;1 | grep "event_id"</code></td><td>Trace a specific event through the pipeline</td></tr>
+    </tbody>
+  </table>

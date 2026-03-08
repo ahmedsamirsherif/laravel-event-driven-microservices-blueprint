@@ -1,0 +1,242 @@
+<h1>Event Flow</h1>
+  <p>Complete lifecycle of employee events: which classes fire them, how they cross the service boundary, and how they are consumed, projected, cached, and broadcast.</p>
+
+  <hr>
+
+  <h2>1. Origin — Domain Events (HR Service)</h2>
+  <p>Three domain events exist in <code>hr-service/src/app/Domain/Employee/Events/</code>:</p>
+  <table>
+    <thead><tr><th>Event class</th><th>Fired by</th><th>Carries</th></tr></thead>
+    <tbody>
+      <tr><td><code>EmployeeCreated</code></td><td><code>CreateEmployeeAction</code></td><td><code>Employee $employee</code></td></tr>
+      <tr><td><code>EmployeeUpdated</code></td><td><code>UpdateEmployeeAction</code></td><td><code>Employee $employee</code>, <code>array $changedFields</code></td></tr>
+      <tr><td><code>EmployeeDeleted</code></td><td><code>DeleteEmployeeAction</code></td><td><code>Employee $employee</code></td></tr>
+    </tbody>
+  </table>
+  <p>Each Action class lives in <code>app/Application/Employee/Actions/</code>, receives a DTO, calls the repository, then dispatches:</p>
+  <pre><code>// CreateEmployeeAction::execute()
+$employee = $this->repository->create($dto);
+Event::dispatch(new EmployeeCreated($employee));</code></pre>
+  <p><code>UpdateEmployeeAction</code> tracks which fields changed by diffing <code>$employee->only($tracked)</code> before and after the DB write, passing the result as <code>$changedFields</code>.</p>
+
+  <h2>2. Listener — Building the RabbitMQ Message (HR Service)</h2>
+  <p><code>AppServiceProvider::boot()</code> wires listeners:</p>
+  <pre><code>Event::listen(EmployeeCreated::class, [PublishEmployeeEventToRabbitMQ::class, 'handleCreated']);
+Event::listen(EmployeeUpdated::class, [PublishEmployeeEventToRabbitMQ::class, 'handleUpdated']);
+Event::listen(EmployeeDeleted::class, [PublishEmployeeEventToRabbitMQ::class, 'handleDeleted']);</code></pre>
+  <p><code>PublishEmployeeEventToRabbitMQ</code> (in <code>app/Application/Employee/Listeners/</code>) builds the routing key and payload:</p>
+  <ul>
+    <li><strong>Routing key</strong>: <code>employee.{action}.{country}</code> — e.g. <code>employee.created.usa</code>
+      <ul>
+        <li><code>{action}</code> = lowercase of <code>Created</code>/<code>Updated</code>/<code>Deleted</code></li>
+        <li><code>{country}</code> = lowercase of <code>$employee->country</code></li>
+      </ul>
+    </li>
+    <li><strong>Payload</strong> (matches JSON Schema contract):</li>
+  </ul>
+  <pre><code>{
+  "event_type": "EmployeeCreated",
+  "event_id": "&lt;uuid-v4&gt;",
+  "timestamp": "&lt;ISO 8601&gt;",
+  "country": "USA",
+  "schema_version": "1.0",
+  "data": {
+    "employee_id": 1,
+    "changed_fields": [],
+    "employee": {
+      "id": 1, "name": "John", "last_name": "Doe",
+      "salary": 75000, "country": "USA",
+      "ssn": "123-45-6789", "address": "123 Main St",
+      "goal": null, "tax_id": null
+    }
+  }
+}</code></pre>
+  <p>The <code>employeePayload()</code> method uses <code>Arr::only()</code> to whitelist exactly these fields from the model: <code>id</code>, <code>name</code>, <code>last_name</code>, <code>salary</code>, <code>country</code>, <code>ssn</code>, <code>address</code>, <code>goal</code>, <code>tax_id</code>, plus the five <code>doc_*</code> fields.</p>
+
+  <h2>3. Publisher — AMQP Transport (HR Service)</h2>
+  <p><code>RabbitMQPublisher</code> (in <code>app/Infrastructure/Messaging/</code>) handles the AMQP connection:</p>
+  <ul>
+    <li>Exchange: <code>employee_events</code> (type: <code>topic</code>, durable)</li>
+    <li><code>AMQPMessage</code> properties:
+      <ul>
+        <li><code>content_type</code>: <code>application/json</code></li>
+        <li><code>delivery_mode</code>: <code>DELIVERY_MODE_PERSISTENT</code> (survives broker restart)</li>
+        <li><code>message_id</code>: <code>$payload['event_id']</code> (the UUID)</li>
+      </ul>
+    </li>
+    <li>Connection is lazy and reused; disconnects on <code>__destruct</code></li>
+    <li>On publish failure: logs error, disconnects (forces reconnect next time), re-throws</li>
+  </ul>
+
+  <h2>4. RabbitMQ Broker</h2>
+  <pre><code>Exchange: employee_events (topic, durable)
+  Routing keys:  employee.created.usa
+                 employee.updated.deu
+                 employee.deleted.usa
+
+  Binding: employee.#  →  Queue: hub_employee_events
+
+Queue: hub_employee_events (durable, TTL 24h)
+  x-dead-letter-exchange: employee_events_dlx
+
+DLX: employee_events_dlx (fanout, durable)
+  →  DLQ: hub_employee_events_dlq (durable)</code></pre>
+
+  <h2>5. Consumer — Receiving Messages (Hub Service)</h2>
+  <p><code>RabbitMQConsumer</code> (in <code>hub-service/src/app/Infrastructure/Messaging/</code>) runs as <code>php artisan rabbitmq:consume</code> inside the <code>hub-consumer</code> Docker container.</p>
+  <p><strong>Startup:</strong></p>
+  <ol>
+    <li><code>pcntl_async_signals(true)</code> + SIGTERM/SIGINT handlers set <code>$shouldStop = true</code></li>
+    <li>Connect to RabbitMQ, declare exchange + DLX + DLQ</li>
+    <li><code>basic_qos(prefetch=1)</code> — one message at a time</li>
+    <li><code>basic_consume()</code> starts the loop; polls with 1s timeout</li>
+  </ol>
+  <p>On message receipt, <code>processMessage()</code> runs:</p>
+  <pre><code>1. JSON-decode the body
+2. Pass payload array to EventProcessingPipeline::process()
+3. On success:
+   a. Fetch fresh checklist via ChecklistService (cache already warmed by handler)
+   b. Dispatch EmployeeUpdatedBroadcast (ShouldBroadcastNow → Reverb)
+   c. Record metrics (events_processed, processing_duration)
+   d. msg->ack()
+4. On failure:
+   a. If retry_count &lt; 3 → re-publish with x-retry-count+1, ack original
+   b. If retry_count &gt;= 3 → msg->nack(requeue=false) → routes to DLQ</code></pre>
+
+  <h3>Retry Strategy</h3>
+  <table>
+    <thead><tr><th>Attempt</th><th>Delay</th><th>Mechanism</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>1s</td><td>Re-publish with <code>x-retry-count: 1</code> header</td></tr>
+      <tr><td>2</td><td>2s</td><td>Re-publish with <code>x-retry-count: 2</code> header</td></tr>
+      <tr><td>3</td><td>4s</td><td>Re-publish with <code>x-retry-count: 3</code> header</td></tr>
+      <tr><td>4</td><td>—</td><td><code>nack(requeue=false)</code> routes to DLQ via DLX</td></tr>
+    </tbody>
+  </table>
+  <p>Retry count is stored in <code>application_headers</code> as <code>x-retry-count</code>. The <code>requeueWithDelay()</code> method acks the original message and publishes a copy with the incremented header.</p>
+
+  <h2>6. Processing Pipeline (Hub Service)</h2>
+  <p><code>EventProcessingPipeline</code> (in <code>app/Application/EventProcessing/Pipeline/</code>) is registered as a singleton in <code>AppServiceProvider</code> with three handlers piped in order:</p>
+  <pre><code>$pipeline->pipe($app->make(EmployeeCreatedHandler::class));
+$pipeline->pipe($app->make(EmployeeUpdatedHandler::class));
+$pipeline->pipe($app->make(EmployeeDeletedHandler::class));</code></pre>
+  <p><code>process(array $payload)</code> runs:</p>
+  <table>
+    <thead><tr><th>Step</th><th>Action</th><th>Table</th></tr></thead>
+    <tbody>
+      <tr><td>1. Idempotency</td><td><code>ProcessedEvent::where('event_id', ...)->exists()</code> — skip if true</td><td><code>processed_events</code></td></tr>
+      <tr><td>2. Log receipt</td><td><code>EventLog::updateOrCreate(['event_id' => $eventId], [...status=received])</code></td><td><code>event_log</code></td></tr>
+      <tr><td>3. Find handler</td><td>Iterate <code>$handlers</code>, call <code>$handler->supports($payload)</code></td><td>—</td></tr>
+      <tr><td>4. Execute</td><td><code>$handler->handle($payload)</code></td><td>varies</td></tr>
+      <tr><td>5. Mark done</td><td><code>ProcessedEvent::create([...])</code> + <code>EventLog->update(['status' => 'processed'])</code></td><td>both</td></tr>
+      <tr><td>On error</td><td><code>EventLog->update(['status' => 'failed', 'error_message' => ...])</code> then re-throw</td><td><code>event_log</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>7. Event Handlers (Hub Service)</h2>
+  <p>All in <code>app/Application/EventProcessing/Handlers/</code>, all <code>final</code>, all implement <code>EventHandlerInterface</code>:</p>
+  <pre><code>interface EventHandlerInterface {
+    public function supports(array $payload): bool;
+    public function handle(array $payload): void;
+}</code></pre>
+
+  <h3>EmployeeCreatedHandler / EmployeeUpdatedHandler</h3>
+  <ol>
+    <li><code>ProjectionDataBuilder::build($employeeId, $employee, $country)</code> maps payload to projection columns</li>
+    <li><code>EmployeeProjectionRepositoryInterface::upsert($data)</code> — upserts into <code>employee_projections</code></li>
+    <li><code>InvalidatesCache</code> trait:
+      <ul>
+        <li>Bumps <code>employees:{country}:v</code> version counter (used for cache-busting paginated lists)</li>
+        <li>Forgets <code>checklist:{country}:{employeeId}</code> and <code>checklist_summary:{country}</code></li>
+      </ul>
+    </li>
+    <li>Dispatches <code>EmployeeEventReceived</code> domain event (internal, not broadcast)</li>
+  </ol>
+
+  <h3>EmployeeDeletedHandler</h3>
+  <p>Same as above except calls <code>repository->delete($employeeId)</code> instead of upsert.</p>
+
+  <h3>ProjectionDataBuilder</h3>
+  <p>Maps the raw employee array to a flat structure matching <code>employee_projections</code> columns. Includes <code>raw_data</code> (the full employee array stored as JSON) for future extensibility.</p>
+
+  <h2>8. Broadcasting — WebSocket (Hub Service)</h2>
+  <p>After the pipeline succeeds, <code>RabbitMQConsumer</code> dispatches <code>EmployeeUpdatedBroadcast</code>:</p>
+  <pre><code>Event::dispatch(new EmployeeUpdatedBroadcast(
+    eventType:     $eventType,       // "EmployeeCreated"
+    country:       $country,         // "USA"
+    employeeId:    $employeeId,      // 1
+    employeeData:  $payload['data']['employee'],
+    eventId:       $payload['event_id'],
+    checklistData: $checklistData,   // freshly computed checklist (null for deletes)
+));</code></pre>
+  <p><code>EmployeeUpdatedBroadcast</code> implements <code>ShouldBroadcastNow</code> (bypasses queue, sends immediately to Reverb):</p>
+  <ul>
+    <li><strong>Channels</strong>: <code>employees</code> (global), <code>country.{country}</code>, <code>checklist.{country}</code></li>
+    <li><strong>Event name</strong>: <code>employee.updated</code></li>
+    <li><strong>Payload</strong>: <code>event_type</code>, <code>country</code>, <code>employee_id</code>, <code>employee_data</code>, <code>event_id</code>, <code>checklist_completion</code>, <code>timestamp</code></li>
+  </ul>
+  <p>Reverb runs in its own container (<code>php artisan reverb:start --host=0.0.0.0 --port=8080</code>) and pushes to connected WebSocket clients.</p>
+
+  <h2>9. Data Flow Diagram</h2>
+  <pre><code>Client                  HR Service                 RabbitMQ                Hub Consumer              Hub DB                  Reverb/WS
+  |                        |                          |                       |                       |                       |
+  |-- POST /employees ---->|                          |                       |                       |                       |
+  |                        |-- INSERT employees ----->|                       |                       |                       |
+  |                        |                          |                       |                       |                       |
+  |                        |-- Event::dispatch ------>|                       |                       |                       |
+  |                        |   EmployeeCreated        |                       |                       |                       |
+  |                        |                          |                       |                       |                       |
+  |                        |-- basic_publish -------->|                       |                       |                       |
+  |                        |   employee.created.usa   |                       |                       |                       |
+  |<-- 201 Created --------|                          |                       |                       |                       |
+  |                        |                          |-- deliver msg ------->|                       |                       |
+  |                        |                          |                       |-- idempotency check ->|                       |
+  |                        |                          |                       |-- log event --------->|                       |
+  |                        |                          |                       |-- upsert projection ->|                       |
+  |                        |                          |                       |-- invalidate cache    |                       |
+  |                        |                          |                       |-- mark processed ---->|                       |
+  |                        |                          |                       |                       |                       |
+  |                        |                          |                       |-- broadcast ----------------------------------------->|
+  |                        |                          |                       |   EmployeeUpdatedBroadcast (ShouldBroadcastNow)      |
+  |                        |                          |<-- ack ---------------|                       |                       |
+  |                        |                          |                       |                       |                       |
+  |<--------------------------------------------- WS push: employee.updated --------------------------------------------|</code></pre>
+
+  <h2>10. Data Contract</h2>
+  <p>The shared contract is defined in <code>contracts/employee-event.schema.json</code> (JSON Schema 2020-12).</p>
+  <p>Both services have contract tests validating payloads against this schema. The <code>schema_version</code> field (<code>"1.0"</code>) is included in every event for future evolution. <code>CountryCode</code> enum is consciously duplicated in each service to avoid shared-library coupling.</p>
+
+  <h2>11. Key Classes Reference</h2>
+  <table>
+    <thead><tr><th>Class</th><th>Service</th><th>Layer</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>EmployeeCreated/Updated/Deleted</code></td><td>HR</td><td>Domain</td><td>Domain events (plain DTOs)</td></tr>
+      <tr><td><code>PublishEmployeeEventToRabbitMQ</code></td><td>HR</td><td>Application</td><td>Listener: builds payload, delegates to publisher</td></tr>
+      <tr><td><code>RabbitMQPublisher</code></td><td>HR</td><td>Infrastructure</td><td>AMQP transport: connection, exchange, publish</td></tr>
+      <tr><td><code>RabbitMQConsumer</code></td><td>Hub</td><td>Infrastructure</td><td>AMQP consumer: polling loop, retry, DLQ, broadcast dispatch</td></tr>
+      <tr><td><code>EventProcessingPipeline</code></td><td>Hub</td><td>Application</td><td>Orchestrator: idempotency, logging, handler dispatch, completion</td></tr>
+      <tr><td><code>EmployeeCreatedHandler</code></td><td>Hub</td><td>Application</td><td>Upserts projection, invalidates cache</td></tr>
+      <tr><td><code>EmployeeUpdatedHandler</code></td><td>Hub</td><td>Application</td><td>Upserts projection, invalidates cache</td></tr>
+      <tr><td><code>EmployeeDeletedHandler</code></td><td>Hub</td><td>Application</td><td>Deletes projection, invalidates cache</td></tr>
+      <tr><td><code>ProjectionDataBuilder</code></td><td>Hub</td><td>Application</td><td>Maps event payload to <code>employee_projections</code> row</td></tr>
+      <tr><td><code>InvalidatesCache</code> (trait)</td><td>Hub</td><td>Application</td><td>Bumps version counter, clears checklist cache</td></tr>
+      <tr><td><code>EmployeeUpdatedBroadcast</code></td><td>Hub</td><td>Infrastructure</td><td><code>ShouldBroadcastNow</code> event for Reverb WebSocket</td></tr>
+      <tr><td><code>ChecklistService</code></td><td>Hub</td><td>Application</td><td>Computes checklist from projection + country module rules</td></tr>
+      <tr><td><code>EventLog</code></td><td>Hub</td><td>Domain</td><td>Audit log model (<code>event_log</code> table)</td></tr>
+      <tr><td><code>ProcessedEvent</code></td><td>Hub</td><td>Domain</td><td>Idempotency model (<code>processed_events</code> table)</td></tr>
+      <tr><td><code>ReceivedEventDTO</code></td><td>Hub</td><td>Domain</td><td>Typed DTO with <code>fromArray()</code>/<code>fromJson()</code> static constructors</td></tr>
+      <tr><td><code>EmployeeEventReceived</code></td><td>Hub</td><td>Domain</td><td>Internal domain event (not broadcast)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Live RabbitMQ Management</h2>
+  <div class="screenshot-grid">
+    <div class="screenshot-item">
+      <img src="screenshots/rabbitmq-overview.png" alt="RabbitMQ management overview showing connections, channels, exchanges, queues" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-blue">RABBITMQ</span> Management dashboard — connections, exchanges, queues, memory usage</div>
+    </div>
+    <div class="screenshot-item">
+      <img src="screenshots/rabbitmq-queues.png" alt="RabbitMQ queues showing hub_employee_events with DLX and TTL features" loading="lazy">
+      <div class="screenshot-caption"><span class="caption-badge badge-blue">QUEUES</span> Queue configuration — durable queue with TTL and DLX, plus dead letter queue</div>
+    </div>
+  </div>

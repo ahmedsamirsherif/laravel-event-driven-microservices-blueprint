@@ -1,0 +1,154 @@
+<h1>Testing</h1>
+
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-number">175</div><div class="stat-label">Total Tests</div></div>
+    <div class="stat-box"><div class="stat-number">47</div><div class="stat-label">HR Service</div></div>
+    <div class="stat-box"><div class="stat-number">128</div><div class="stat-label">Hub Service</div></div>
+    <div class="stat-box"><div class="stat-number">5</div><div class="stat-label">Test Suites</div></div>
+  </div>
+
+  <p>All tests use <strong>Pest PHP 3.8.5</strong> with <code>pestphp/pest-plugin-arch</code> for architecture enforcement. Tests run against real PostgreSQL databases (not SQLite) for production parity.</p>
+
+  <h2>Run Commands</h2>
+  <table>
+    <thead><tr><th>Command</th><th>Scope</th></tr></thead>
+    <tbody>
+      <tr><td><code>make test</code></td><td>All tests (HR + Hub)</td></tr>
+      <tr><td><code>make test-hr</code></td><td>HR Service (47 tests)</td></tr>
+      <tr><td><code>make test-hub</code></td><td>Hub Service (128 tests)</td></tr>
+      <tr><td><code>make test-unit</code></td><td>Unit tests only</td></tr>
+      <tr><td><code>make test-feature</code></td><td>Feature (HTTP) tests only</td></tr>
+      <tr><td><code>make test-integration</code></td><td>Integration tests only</td></tr>
+      <tr><td><code>make test-arch</code></td><td>Architecture enforcement tests</td></tr>
+      <tr><td><code>make test-contract</code></td><td>Event schema contract tests</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How <code>it()</code> Works</h2>
+  <p>Every test is defined with <code>it()</code>, Pest's wrapper around PHPUnit's <code>TestCase</code>. When you write:</p>
+
+  <pre><code>it('creates a USA employee', function () {
+    $this->postJson('/api/v1/employees', [...])
+        ->assertCreated();
+});</code></pre>
+
+  <p>Behind the scenes:</p>
+  <ol>
+    <li>Pest creates a <strong>PHPUnit TestCase</strong> class and binds the closure as a method</li>
+    <li><code>$this</code> inside the closure <strong>is</strong> the Laravel <code>TestCase</code> instance &mdash; giving access to <code>postJson()</code>, <code>assertDatabaseHas()</code>, etc.</li>
+    <li>The <code>RefreshDatabase</code> trait (applied via <code>uses()</code>) wraps each test in a <strong>database transaction</strong> that rolls back after the test</li>
+    <li><code>Event::fake()</code> in <code>beforeEach()</code> intercepts domain events so RabbitMQ publish listeners never fire during tests</li>
+  </ol>
+
+  <p><strong>Datasets</strong> multiply test cases from a single <code>it()</code>:</p>
+  <pre><code>it('rejects invalid inputs', function (array $payload) {
+    $this->postJson('/api/v1/employees', $payload)
+        ->assertUnprocessable();
+})->with([
+    'invalid SSN'   => [['name' => 'J', ...]],
+    'missing tax_id' => [['name' => 'H', ...]],
+]);
+// Produces 2 separate test runs from 1 it() call</code></pre>
+
+  <h2>How <code>arch()</code> Works</h2>
+  <p>Architecture tests enforce structural rules using <strong>static analysis</strong> (reflection + AST inspection). No application code is executed:</p>
+
+  <pre><code>arch('domain does not depend on infrastructure')
+    ->expect('App\Domain')
+    ->not->toUse('App\Infrastructure');</code></pre>
+
+  <table>
+    <thead><tr><th>Assertion</th><th>What It Checks</th></tr></thead>
+    <tbody>
+      <tr><td><code>->not->toUse('Namespace')</code></td><td>Scans <code>use</code> statements and string references &mdash; no imports from forbidden namespace</td></tr>
+      <tr><td><code>->toBeReadonly()</code></td><td>Confirms all classes in namespace are <code>readonly class</code></td></tr>
+      <tr><td><code>->toBeFinal()</code></td><td>Confirms all classes are <code>final class</code></td></tr>
+      <tr><td><code>->toBeInterfaces()</code></td><td>Confirms all types are <code>interface</code></td></tr>
+      <tr><td><code>->toImplement(Interface::class)</code></td><td>Confirms classes implement the given interface</td></tr>
+      <tr><td><code>->not->toBeUsed()</code></td><td>For function names: scans entire codebase for calls to forbidden functions</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    The <code>not->toBeUsed()</code> check for <code>dd</code>, <code>dump</code>, <code>ray</code>, <code>var_dump</code> catches debug calls left in production code by scanning every PHP file's AST.
+  </div>
+
+  <h2>Test Suites</h2>
+
+  <h3>Unit Tests</h3>
+  <p>Isolated domain logic with no external dependencies:</p>
+  <ul>
+    <li><strong>Value Objects</strong>: SSN, TaxId, Salary &mdash; validation, formatting, edge cases</li>
+    <li><strong>Actions</strong>: Create/Update/Delete employee &mdash; repository mock + event dispatch verification</li>
+    <li><strong>Handlers</strong>: Event processing handlers &mdash; projection upsert/delete + cache invalidation</li>
+    <li><strong>Pipeline</strong>: <code>EventProcessingPipeline</code> &mdash; idempotency, logging, handler dispatch</li>
+    <li><strong>Commands</strong>: <code>events:stats</code>, <code>events:replay</code>, <code>events:retry-failed</code></li>
+    <li><strong>Country modules</strong>: USAModule, DEUModule &mdash; steps, columns, widgets, schema fields</li>
+  </ul>
+
+  <h3>Feature Tests</h3>
+  <p>Full HTTP request/response cycles with real PostgreSQL:</p>
+  <ul>
+    <li>Employee CRUD with country-specific validation</li>
+    <li>Pagination, filtering, error envelope format</li>
+    <li>Health check and Prometheus metrics endpoints</li>
+    <li>Checklist, Steps, Schema endpoints (Hub)</li>
+    <li>Fortification: rate limiting, forced JSON, request ID, CORS</li>
+  </ul>
+
+  <h3>Integration Tests</h3>
+  <p>Cross-boundary interactions:</p>
+  <ul>
+    <li>Event publishing &mdash; changed fields detection, deleted snapshot</li>
+    <li>Cache behaviour &mdash; invalidation, eager rebuild</li>
+    <li>Event pipeline &mdash; end-to-end processing with projections</li>
+  </ul>
+
+  <h3>Architecture Tests</h3>
+  <p>Structural rules enforced by Pest Arch plugin (11 HR + 11 Hub):</p>
+  <ul>
+    <li>Domain layer has no dependency on Infrastructure or HTTP</li>
+    <li>DTOs and Value Objects are <code>readonly</code></li>
+    <li>Actions and Pipelines are <code>final</code></li>
+    <li>Repository interfaces are <code>interface</code></li>
+    <li>No <code>dd</code>/<code>dump</code>/<code>var_dump</code> calls in codebase</li>
+  </ul>
+
+  <h3>Contract Tests</h3>
+  <p>Validate event payloads against the shared JSON Schema 2020-12 contract at <code>contracts/employee-event.schema.json</code>.</p>
+
+  <h2>Test Database Setup</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Database</th><th>User</th></tr></thead>
+    <tbody>
+      <tr><td>HR Service</td><td><code>hr_service_test</code></td><td><code>hr_user</code></td></tr>
+      <tr><td>Hub Service</td><td><code>hub_service_test</code></td><td><code>hub_user</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-success">
+    <strong>Test Isolation:</strong> <code>TestCase.php</code> forces <code>array</code> cache driver, <code>sync</code> queue driver, and <code>array</code> session driver to prevent cross-test contamination.
+  </div>
+
+  <h2>Sample Test Run</h2>
+  <div class="terminal-block">
+<span class="t-gray">$ docker compose exec hr-service php artisan test</span>
+
+   <span class="t-green">PASS</span>  Tests\Unit\Domain\ValueObjects\SSNTest
+   <span class="t-green">&#10003;</span> it accepts valid SSN and converts to string
+   <span class="t-green">&#10003;</span> it rejects invalid SSN formats
+   <span class="t-green">&#10003;</span> it masks SSN showing only last 4 digits
+
+   <span class="t-green">PASS</span>  Tests\Feature\Http\EmployeeControllerTest
+   <span class="t-green">&#10003;</span> it creates a USA employee with all required fields
+   <span class="t-green">&#10003;</span> it creates a DEU employee with doc URLs
+   <span class="t-green">&#10003;</span> it rejects invalid inputs with 422
+
+   <span class="t-green">PASS</span>  Tests\Arch\ArchitectureTest
+   <span class="t-green">&#10003;</span> domain does not depend on infrastructure
+   <span class="t-green">&#10003;</span> dtos are readonly
+   <span class="t-green">&#10003;</span> value objects are readonly
+
+   <span class="t-bold t-green">Tests:    47 passed (163 assertions)</span>
+   <span class="t-gray">Duration: 0.80s</span>
+  </div>
