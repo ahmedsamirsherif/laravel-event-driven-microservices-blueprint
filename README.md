@@ -10,6 +10,8 @@ The hosted website docs are the best way to browse the case study end to end:
 
 [Event-Driven Multi-Country HR Platform Case Study](https://ahmedsamirsherif.github.io/laravel-event-driven-microservices-blueprint/#overview)
 
+The Overview page also includes a playable demo video tab.
+
 ## Quick Start
 
 ```bash

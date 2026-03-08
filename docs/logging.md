@@ -1,201 +1,86 @@
 # Logging
 
-Both services use Laravel's logging system with **structured context** and **stderr output** for Docker-native log collection.
+Logging is part of the runtime contract in this platform, not leftover debug output. The HR API, Hub API, and Hub consumer all emit structured Laravel logs to `stderr`, so Docker and container-native log collection see the same stream.
 
----
+Messages follow one deliberate shape:
 
-## Configuration
-
-| Setting | Value | Source |
-|---------|-------|--------|
-| Channel | `stderr` | `LOG_CHANNEL` env var in `docker-compose.yml` |
-| Level | `debug` | `LOG_LEVEL` env var in `docker-compose.yml` |
-| Driver | `monolog` with `StreamHandler` → `php://stderr` | `config/logging.php` → `stderr` channel |
-| Format | Laravel default (timestamp + channel + level + message + context JSON) | Monolog default formatter |
-
-All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures as JSON logs.
-
-```bash
-# CLI — Docker log access
-docker compose logs hr-service        # HR logs
-docker compose logs hub-consumer      # Consumer pipeline logs
-docker compose logs -f                # Follow all services
+```text
+[ClassName][method] Message
 ```
 
-## Available Channels
+The message stays static and searchable. Variable data lives in the context array. Caught throwables are passed under the PSR-3 `exception` key.
 
-Both services define these channels in `config/logging.php`. Only `stderr` is active in Docker:
+## Runtime Model
 
-| Channel | Driver | Output |
-|---------|--------|--------|
-| `stack` | Stack | Combines multiple channels |
-| `single` | Monolog | `storage/logs/laravel.log` |
-| `daily` | Monolog | Rolling daily log files |
-| `stderr` | Monolog | `php://stderr` (active) |
-| `syslog` | Syslog | System log |
-| `errorlog` | Error log | PHP `error_log()` |
-| `null` | Monolog | No output (discard) |
+| Item | Value |
+| --- | --- |
+| Active channel | `stderr` via Monolog `StreamHandler` |
+| Default level | `debug` |
+| Correlation | `X-Request-ID` shared with `Log::shareContext(...)` |
+| Runtime emitters | `hr-service`, `hub-service`, `hub-consumer`, `reverb` |
 
-## Request ID Context
+Both applications still define Laravel's standard fallback channels (`stack`, `single`, `daily`, `syslog`, `errorlog`, `null`), but the Docker runtime path uses `stderr`.
 
-Both services inject a `request_id` into every log entry via the `AddRequestId` middleware:
+## Conventions
+
+- Keep message text static and scoped.
+- Put IDs, country codes, retry counters, durations, cache flags, and queue names in context.
+- Pass caught throwables as `['exception' => $e]`.
+- Reuse the same `request_id` across the full request lifecycle.
 
 ```php
-// AddRequestId middleware — runs on every API request
 $requestId = $request->header('X-Request-ID') ?? (string) Str::uuid();
-Log::withContext(['request_id' => $requestId]);
+Log::shareContext(['request_id' => $requestId]);
 ```
 
-This means every log line produced during a request carries the same `request_id`, enabling end-to-end tracing. The ID is also returned in the response header `X-Request-ID`.
+## Current Inventory
 
-## Log Levels Used
+The application currently has `30` log call sites: `16` info, `7` warning, `5` error, and `2` debug. The count excludes console output such as `$this->info(...)` and the two `Log::shareContext(...)` registrations.
 
-| Level | Count | When Used |
-|-------|-------|-----------|
-| `error` | 6 | Unrecoverable failures — event publish failure, message processing failure, unhandled exceptions |
-| `warning` | 9 | Degraded but recoverable — metrics recording failure, no handler for event, broadcast failure (non-fatal), DLQ routing, health check degraded |
-| `info` | 29 | Operational events — employee CRUD, event published/processed, consumer start/stop, handler execution, broadcast sent, retry/requeue, signal received |
-| `debug` | 2 | Verbose tracing — employee list served, checklist served (Hub only) |
+| Scope | Levels | Typical messages | Main context |
+| --- | --- | --- | --- |
+| Cross-cutting | `warning`, `error` | `Request metrics recording failed`, `Unhandled exception` | `request_id`, `method`, `endpoint`, `status`, `exception` |
+| HR write side | `info`, `error` | `Employee created`, `Employee updated`, `Employee deleted`, `Event published`, `Failed to publish event` | `employee_id`, `country`, `changed_fields`, `routing_key`, `event_id`, `exception` |
+| Hub read side | `debug`, `warning` | `Employee list served`, `Checklist served`, `Hub service health check degraded`, `Consistency check failed` | `country`, `page`, `per_page`, cache hit flags, `checks`, totals |
+| Hub event pipeline | `info`, `warning`, `error` | `Duplicate event skipped`, `Dispatching event to handler`, `No handler found for event`, `Broadcast sent via Reverb`, `Failed to process RabbitMQ message`, `Message exhausted retries; routing to DLQ` | `event_type`, `event_id`, `employee_id`, `country`, `retry_count`, `duration_ms`, `exception` |
 
-## HR Service — Log Points
+## Representative Traces
 
-### Controllers
+### Successful event
 
-| File | Level | Message | Context |
-|------|-------|---------|---------|
-| `EmployeeController` | `info` | Employee created | `employee_id`, `country` |
-| `EmployeeController` | `info` | Employee updated | `employee_id`, `country`, `changed_fields` |
-| `EmployeeController` | `info` | Employee deleted | `employee_id`, `country` |
-
-### Event Publishing
-
-| File | Level | Message | Context |
-|------|-------|---------|---------|
-| `RabbitMQPublisher` | `info` | Event published | `routing_key`, `event_id` |
-| `RabbitMQPublisher` | `error` | Failed to publish event | `routing_key`, `event_id`, `error` |
-| `PublishEmployeeEventToRabbitMQ` | `error` | Failed to publish employee event | `event_type`, `employee_id`, `error` |
-
-### Middleware & Exceptions
-
-| File | Level | Message | Context |
-|------|-------|---------|---------|
-| `AddRequestId` | context | *(sets request_id on all logs)* | `request_id` |
-| `RecordRequestMetrics` | `warning` | Request metrics recording failed | `method`, `endpoint`, `status`, `error` |
-| `Handler` | `error` | Unhandled exception | `exception` (class name), `message` |
-
-## Hub Service — Log Points
-
-### Consumer Lifecycle
-
-| Level | Message | Context |
-|-------|---------|---------|
-| `info` | RabbitMQ consumer started | `queue` |
-| `info` | RabbitMQ consumer stopped gracefully | — |
-| `info` | Received SIGTERM - stopping consumer gracefully | — |
-| `info` | Received SIGINT - stopping consumer gracefully | — |
-
-### Event Processing Pipeline
-
-| Level | Message | Context |
-|-------|---------|---------|
-| `info` | Duplicate event skipped | `event_id`, `event_type` |
-| `info` | Dispatching to handler | `handler` (class name), `event_type` |
-| `warning` | No handler for event | `event_type` |
-
-### Event Handlers
-
-| Level | Message | Context |
-|-------|---------|---------|
-| `info` | EmployeeCreated handled | `employee_id`, `country` |
-| `info` | EmployeeUpdated handled | `employee_id`, `country` |
-| `info` | EmployeeDeleted handled | `employee_id`, `country` |
-
-### Message Processing & Retries
-
-| Level | Message | Context |
-|-------|---------|---------|
-| `info` | Event fully processed | `event_type`, `employee_id`, `country`, `duration_ms`, `retry_count` |
-| `error` | Failed to process RabbitMQ message | `event_type`, `retry_count`, `error` |
-| `info` | Message re-queued for retry | `retry_count`, `delay_ms` |
-| `warning` | Message exhausted retries, sending to DLQ | `event_type`, `retry_count` |
-
-### Broadcasting
-
-| Level | Message | Context |
-|-------|---------|---------|
-| `info` | Broadcast sent via Reverb | `event_type`, `employee_id`, `country`, `channels` |
-| `warning` | Broadcast to Reverb failed (non-fatal) | `event_type`, `error` |
-
-### Controllers & Health
-
-| File | Level | Message | Context |
-|------|-------|---------|---------|
-| `EmployeeController` | `debug` | Employee list served | `country` |
-| `ChecklistController` | `debug` | Checklist served | `country` |
-| `HealthController` | `warning` | Hub service health check degraded | `checks` |
-
-## Exception Handling
-
-Both services use a custom `Handler` in `app/Exceptions/Handler.php`:
-
-```php
-$this->renderable(function (Throwable $e) {
-    Log::error('Unhandled exception', [
-        'exception' => get_class($e),
-        'message'   => $e->getMessage(),
-    ]);
-    // Returns standardized JSON error envelope
-});
+```text
+[INFO] [EmployeeController][store] Employee created {"employee_id":1,"country":"USA","request_id":"abc-123"}
+[INFO] [RabbitMQPublisher][publish] Event published {"routing_key":"employee.created.usa","event_id":"evt-456","request_id":"abc-123"}
+[INFO] [EventProcessingPipeline][process] Dispatching event to handler {"handler":"App\\Application\\EventProcessing\\Handlers\\EmployeeCreatedHandler","event_type":"EmployeeCreated","event_id":"evt-456","country":"USA"}
+[INFO] [EmployeeCreatedHandler][handle] Employee created event handled {"employee_id":1,"country":"USA"}
+[INFO] [RabbitMQConsumer][processMessage] Broadcast sent via Reverb {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","channels":["employees","country.USA"]}
+[INFO] [RabbitMQConsumer][processMessage] Event fully processed {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","duration_ms":45.12,"retry_count":0}
 ```
 
-This catches all unhandled exceptions, logs them at `error` level, and returns a consistent JSON response with the error code and message.
+The consumer log currently records `employees` and `country.{country}` in its `channels` field. The broadcast event itself also fans out to `checklist.{country}`.
 
-## Event Pipeline Log Trace
+### Failed event
 
-A successful employee creation produces this log sequence across services:
-
-```
-# HR Service (hr-service container)
-[INFO] Employee created                  {"employee_id":1,"country":"USA","request_id":"abc-123"}
-[INFO] Event published                   {"routing_key":"employee.created.usa","event_id":"evt-456","request_id":"abc-123"}
-
-# Hub Service (hub-consumer container)
-[INFO] Dispatching to handler            {"handler":"EmployeeCreatedHandler","event_type":"EmployeeCreated"}
-[INFO] EmployeeCreated handled           {"employee_id":1,"country":"USA"}
-[INFO] Broadcast sent via Reverb         {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","channels":["employees","country.USA","checklist.USA"]}
-[INFO] Event fully processed             {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","duration_ms":45,"retry_count":0}
-```
-
-## Failed Event Log Trace
-
-When processing fails and retries exhaust:
-
-```
-# Attempt 1
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":0,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":1,"delay_ms":1000}
-
-# Attempt 2
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":1,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":2,"delay_ms":2000}
-
-# Attempt 3
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":2,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":3,"delay_ms":4000}
-
-# Attempt 4 — max retries exceeded
-[ERROR]   Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":3,"error":"Connection refused"}
-[WARNING] Message exhausted retries, sending to DLQ  {"event_type":"EmployeeCreated","retry_count":3}
+```text
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":0,"exception":"<normalized Throwable>"}
+[INFO] [RabbitMQConsumer][requeueWithDelay] Message re-queued for retry {"retry_count":1,"delay_ms":1000}
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":1,"exception":"<normalized Throwable>"}
+[INFO] [RabbitMQConsumer][requeueWithDelay] Message re-queued for retry {"retry_count":2,"delay_ms":2000}
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":2,"exception":"<normalized Throwable>"}
+[INFO] [RabbitMQConsumer][requeueWithDelay] Message re-queued for retry {"retry_count":3,"delay_ms":4000}
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":3,"exception":"<normalized Throwable>"}
+[WARNING] [RabbitMQConsumer][processMessage] Message exhausted retries; routing to DLQ {"event_type":"EmployeeCreated","retry_count":3}
 ```
 
 ## Accessing Logs
 
-| Command | What It Shows |
-|---------|---------------|
-| `docker compose logs hr-service` | HR API logs (CRUD operations, event publishing) |
-| `docker compose logs hub-service` | Hub API logs (employee list, checklist, schema endpoints) |
-| `docker compose logs hub-consumer` | Event pipeline logs (processing, handlers, retries, broadcasts) |
-| `docker compose logs reverb` | WebSocket server logs |
-| `docker compose logs -f` | Follow all service logs in real-time |
-| `docker compose logs hub-consumer 2>&1 \| grep ERROR` | Filter for errors only |
-| `docker compose logs hub-consumer 2>&1 \| grep "event_id"` | Trace a specific event through the pipeline |
+| Command | Purpose |
+| --- | --- |
+| `docker compose logs hr-service` | HR API writes and publish flow |
+| `docker compose logs hub-service` | Hub read endpoints and health |
+| `docker compose logs hub-consumer` | Event processing, broadcast, retries, and DLQ flow |
+| `docker compose logs reverb` | WebSocket server activity |
+| `docker compose logs -f --tail=40 hr-service hub-consumer reverb rabbitmq` | Common live view across the moving parts |
+| `docker compose logs -f` | Full live stream |
+| `docker compose logs hub-consumer 2>&1 \| grep '\[RabbitMQConsumer\]'` | Consumer-only lines |
+| `docker compose logs hub-consumer 2>&1 \| grep '"event_id"'` | Trace one event through the pipeline |

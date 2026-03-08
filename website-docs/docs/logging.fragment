@@ -1,203 +1,210 @@
 <h1>Logging</h1>
-  <p>Both services use Laravel's logging system with <strong>structured context</strong> and <strong>stderr output</strong> for Docker-native log collection.</p>
 
-  <hr>
+<div class="stat-grid">
+  <div class="stat-box"><div class="stat-number">16</div><div class="stat-label">Info</div></div>
+  <div class="stat-box"><div class="stat-number">7</div><div class="stat-label">Warnings</div></div>
+  <div class="stat-box"><div class="stat-number">5</div><div class="stat-label">Errors</div></div>
+  <div class="stat-box"><div class="stat-number">2</div><div class="stat-label">Debug</div></div>
+</div>
 
-  <h2>Configuration</h2>
-  <table>
-    <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
-    <tbody>
-      <tr><td>Channel</td><td><code>stderr</code></td><td><code>LOG_CHANNEL</code> env var in <code>docker-compose.yml</code></td></tr>
-      <tr><td>Level</td><td><code>debug</code></td><td><code>LOG_LEVEL</code> env var in <code>docker-compose.yml</code></td></tr>
-      <tr><td>Driver</td><td><code>monolog</code> with <code>StreamHandler</code> → <code>php://stderr</code></td><td><code>config/logging.php</code> → <code>stderr</code> channel</td></tr>
-      <tr><td>Format</td><td>Laravel default (timestamp + channel + level + message + context JSON)</td><td>Monolog default formatter</td></tr>
-    </tbody>
-  </table>
-  <p>All four containers (hr-service, hub-service, hub-consumer, reverb) write to stderr, which Docker captures as JSON logs.</p>
-  <pre><code># CLI — Docker log access
-docker compose logs hr-service        # HR logs
-docker compose logs hub-consumer      # Consumer pipeline logs
-docker compose logs -f                # Follow all services</code></pre>
+<p>Logging is treated as runtime signal, not ad-hoc debug text. The HR API, Hub API, and Hub consumer all emit structured Laravel logs to <code>stderr</code>, which keeps local Docker output and container-native log collection aligned.</p>
 
-  <h2>Available Channels</h2>
-  <p>Both services define these channels in <code>config/logging.php</code>. Only <code>stderr</code> is active in Docker:</p>
-  <table>
-    <thead><tr><th>Channel</th><th>Driver</th><th>Output</th></tr></thead>
-    <tbody>
-      <tr><td><code>stack</code></td><td>Stack</td><td>Combines multiple channels</td></tr>
-      <tr><td><code>single</code></td><td>Monolog</td><td><code>storage/logs/laravel.log</code></td></tr>
-      <tr><td><code>daily</code></td><td>Monolog</td><td>Rolling daily log files</td></tr>
-      <tr><td><code>stderr</code></td><td>Monolog</td><td><code>php://stderr</code> (active)</td></tr>
-      <tr><td><code>syslog</code></td><td>Syslog</td><td>System log</td></tr>
-      <tr><td><code>errorlog</code></td><td>Error log</td><td>PHP <code>error_log()</code></td></tr>
-      <tr><td><code>null</code></td><td>Monolog</td><td>No output (discard)</td></tr>
-    </tbody>
-  </table>
+<div class="callout">
+  <strong>Message contract:</strong>
+  <div class="log-signature">[ClassName][method] Message</div>
+  <div class="log-meta">Dynamic values stay in structured context, request correlation is shared with <code>Log::shareContext(...)</code>, and caught throwables use the PSR-3 <code>exception</code> key.</div>
+</div>
 
-  <h2>Request ID Context</h2>
-  <p>Both services inject a <code>request_id</code> into every log entry via the <code>AddRequestId</code> middleware:</p>
-  <pre><code>// AddRequestId middleware — runs on every API request
-$requestId = $request->header('X-Request-ID') ?? (string) Str::uuid();
-Log::withContext(['request_id' => $requestId]);</code></pre>
-  <p>This means every log line produced during a request carries the same <code>request_id</code>, enabling end-to-end tracing. The ID is also returned in the response header <code>X-Request-ID</code>.</p>
+<div class="content-tabs" data-inline-tabs>
+  <div class="content-tab-list" role="tablist" aria-label="Logging content tabs">
+    <button type="button" class="content-tab-button active" role="tab" aria-selected="true" data-tab-target="logging-overview">
+      <span class="content-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H3a1 1 0 1 1 0-2h6V3a1 1 0 0 1 1-1Z"/></svg>
+      </span>
+      <span>Overview</span>
+    </button>
+    <button type="button" class="content-tab-button" role="tab" aria-selected="false" data-tab-target="logging-inventory">
+      <span class="content-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 3.75A1.75 1.75 0 0 1 5.75 2h8.5A1.75 1.75 0 0 1 16 3.75v12.5A1.75 1.75 0 0 1 14.25 18h-8.5A1.75 1.75 0 0 1 4 16.25V3.75Zm2 .75a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5H6Zm0 4a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5H6Zm0 4a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5H6Z"/></svg>
+      </span>
+      <span>Inventory</span>
+    </button>
+    <button type="button" class="content-tab-button" role="tab" aria-selected="false" data-tab-target="logging-traces">
+      <span class="content-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 5.75A1.75 1.75 0 0 1 4.75 4h2.379a1.75 1.75 0 0 1 1.237.513l.87.87a.25.25 0 0 0 .177.073h5.837A1.75 1.75 0 0 1 17 7.206v7.044A1.75 1.75 0 0 1 15.25 16h-10.5A1.75 1.75 0 0 1 3 14.25V5.75Zm4 2.5a.75.75 0 0 0 0 1.5h5.69l-1.22 1.22a.75.75 0 1 0 1.06 1.06l2.5-2.5a.75.75 0 0 0 0-1.06l-2.5-2.5a.75.75 0 0 0-1.06 1.06l1.22 1.22H7Z"/></svg>
+      </span>
+      <span>Traces</span>
+    </button>
+    <button type="button" class="content-tab-button" role="tab" aria-selected="false" data-tab-target="logging-commands">
+      <span class="content-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3.25 3A2.25 2.25 0 0 0 1 5.25v9.5A2.25 2.25 0 0 0 3.25 17h13.5A2.25 2.25 0 0 0 19 14.75v-9.5A2.25 2.25 0 0 0 16.75 3H3.25Zm1.22 4.22a.75.75 0 0 1 1.06 0L8 9.69l-2.47 2.47a.75.75 0 0 1-1.06-1.06L5.88 9.69 4.47 8.28a.75.75 0 0 1 0-1.06ZM9.5 12a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 0 1.5h-4Z"/></svg>
+      </span>
+      <span>Commands</span>
+    </button>
+  </div>
 
-  <h2>Log Levels Used</h2>
-  <table>
-    <thead><tr><th>Level</th><th>Count</th><th>When Used</th></tr></thead>
-    <tbody>
-      <tr><td><code>error</code></td><td>6</td><td>Unrecoverable failures — event publish failure, message processing failure, unhandled exceptions</td></tr>
-      <tr><td><code>warning</code></td><td>9</td><td>Degraded but recoverable — metrics recording failure, no handler for event, broadcast failure (non-fatal), DLQ routing, health check degraded</td></tr>
-      <tr><td><code>info</code></td><td>29</td><td>Operational events — employee CRUD, event published/processed, consumer start/stop, handler execution, broadcast sent, retry/requeue, signal received</td></tr>
-      <tr><td><code>debug</code></td><td>2</td><td>Verbose tracing — employee list served, checklist served (Hub only)</td></tr>
-    </tbody>
-  </table>
+  <div class="content-tab-panel active" data-tab-panel="logging-overview">
+    <p>What matters here is consistency. The log stream tells you which component emitted the line, which method produced it, and which request or event it belongs to, without hiding important state inside interpolated strings.</p>
 
-  <h2>HR Service — Log Points</h2>
+    <div class="card-grid">
+      <div class="card">
+        <strong>Delivery</strong>
+        <span><code>stderr</code> is the active Docker sink, so <code>docker compose logs</code> shows the same stream the containers emit.</span>
+      </div>
+      <div class="card">
+        <strong>Correlation</strong>
+        <span>Both HTTP services share one <code>request_id</code> through <code>Log::shareContext(...)</code> and return it in <code>X-Request-ID</code>.</span>
+      </div>
+      <div class="card">
+        <strong>Message Shape</strong>
+        <span>Scoped static messages stay grep-friendly. IDs, routing keys, retry counts, and cache flags stay in context.</span>
+      </div>
+      <div class="card">
+        <strong>Exception Shape</strong>
+        <span>Caught throwables are passed as <code>['exception' =&gt; $e]</code>, which keeps Monolog serialization consistent.</span>
+      </div>
+    </div>
 
-  <h3>Controllers</h3>
-  <table>
-    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee created</td><td><code>employee_id</code>, <code>country</code></td></tr>
-      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee updated</td><td><code>employee_id</code>, <code>country</code>, <code>changed_fields</code></td></tr>
-      <tr><td><code>EmployeeController</code></td><td><code>info</code></td><td>Employee deleted</td><td><code>employee_id</code>, <code>country</code></td></tr>
-    </tbody>
-  </table>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Active channel</td><td><code>stderr</code> via Monolog <code>StreamHandler</code></td></tr>
+        <tr><td>Default level</td><td><code>debug</code></td></tr>
+        <tr><td>Runtime emitters</td><td><code>hr-service</code>, <code>hub-service</code>, <code>hub-consumer</code>, <code>reverb</code></td></tr>
+        <tr><td>Fallback channels</td><td><code>stack</code>, <code>single</code>, <code>daily</code>, <code>syslog</code>, <code>errorlog</code>, <code>null</code></td></tr>
+      </tbody>
+    </table>
+  </div>
 
-  <h3>Event Publishing</h3>
-  <table>
-    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>RabbitMQPublisher</code></td><td><code>info</code></td><td>Event published</td><td><code>routing_key</code>, <code>event_id</code></td></tr>
-      <tr><td><code>RabbitMQPublisher</code></td><td><code>error</code></td><td>Failed to publish event</td><td><code>routing_key</code>, <code>event_id</code>, <code>error</code></td></tr>
-      <tr><td><code>PublishEmployeeEventToRabbitMQ</code></td><td><code>error</code></td><td>Failed to publish employee event</td><td><code>event_type</code>, <code>employee_id</code>, <code>error</code></td></tr>
-    </tbody>
-  </table>
+  <div class="content-tab-panel" data-tab-panel="logging-inventory">
+    <p>The log surface is intentionally small: 30 application log call sites in total. That count excludes console output such as <code>$this-&gt;info(...)</code> and the two <code>Log::shareContext(...)</code> registrations.</p>
 
-  <h3>Middleware &amp; Exceptions</h3>
-  <table>
-    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>AddRequestId</code></td><td>context</td><td><em>(sets request_id on all logs)</em></td><td><code>request_id</code></td></tr>
-      <tr><td><code>RecordRequestMetrics</code></td><td><code>warning</code></td><td>Request metrics recording failed</td><td><code>method</code>, <code>endpoint</code>, <code>status</code>, <code>error</code></td></tr>
-      <tr><td><code>Handler</code></td><td><code>error</code></td><td>Unhandled exception</td><td><code>exception</code> (class name), <code>message</code></td></tr>
-    </tbody>
-  </table>
+    <table>
+      <thead><tr><th>Scope</th><th>Levels</th><th>Typical messages</th><th>Main context</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Cross-cutting</td>
+          <td><code>warning</code>, <code>error</code></td>
+          <td><code>Request metrics recording failed</code>, <code>Unhandled exception</code></td>
+          <td><code>request_id</code>, <code>method</code>, <code>endpoint</code>, <code>status</code>, <code>exception</code></td>
+        </tr>
+        <tr>
+          <td>HR write side</td>
+          <td><code>info</code>, <code>error</code></td>
+          <td><code>Employee created</code>, <code>Employee updated</code>, <code>Employee deleted</code>, <code>Event published</code>, <code>Failed to publish event</code></td>
+          <td><code>employee_id</code>, <code>country</code>, <code>changed_fields</code>, <code>routing_key</code>, <code>event_id</code>, <code>exception</code></td>
+        </tr>
+        <tr>
+          <td>Hub read side</td>
+          <td><code>debug</code>, <code>warning</code></td>
+          <td><code>Employee list served</code>, <code>Checklist served</code>, <code>Hub service health check degraded</code>, <code>Consistency check failed</code></td>
+          <td><code>country</code>, paging fields, cache hit flags, <code>checks</code>, totals</td>
+        </tr>
+        <tr>
+          <td>Hub event pipeline</td>
+          <td><code>info</code>, <code>warning</code>, <code>error</code></td>
+          <td><code>Duplicate event skipped</code>, <code>Dispatching event to handler</code>, <code>No handler found for event</code>, <code>Broadcast sent via Reverb</code>, <code>Failed to process RabbitMQ message</code>, <code>Message exhausted retries; routing to DLQ</code></td>
+          <td><code>event_type</code>, <code>event_id</code>, <code>employee_id</code>, <code>country</code>, <code>retry_count</code>, <code>duration_ms</code>, <code>exception</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-  <h2>Hub Service — Log Points</h2>
+  <div class="content-tab-panel" data-tab-panel="logging-traces">
+    <div class="pattern-grid">
+      <article class="pattern-card">
+        <div class="pattern-card-head">
+          <div class="pattern-card-title">
+            <span class="pattern-badge">Success Path</span>
+            <h3>Employee write to live update</h3>
+          </div>
+        </div>
+        <p>A normal event passes through the write API, RabbitMQ, the Hub projection pipeline, and Reverb without changing message shape.</p>
+        <div class="pattern-steps">
+          <div class="pattern-step">
+            <div class="pattern-step-index">1</div>
+            <div class="pattern-step-body"><strong>HR write</strong><span>The controller logs the mutation with <code>employee_id</code>, <code>country</code>, and the shared <code>request_id</code>.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">2</div>
+            <div class="pattern-step-body"><strong>Broker publish</strong><span>The publisher logs the routing key and event ID after RabbitMQ accepts the message.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">3</div>
+            <div class="pattern-step-body"><strong>Projection dispatch</strong><span>The Hub pipeline records handler dispatch and preserves <code>event_id</code>, <code>event_type</code>, and <code>country</code>.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">4</div>
+            <div class="pattern-step-body"><strong>Broadcast complete</strong><span>The consumer logs the broadcast and the final processing duration once the event is fully applied.</span></div>
+          </div>
+        </div>
+      </article>
 
-  <h3>Consumer Lifecycle</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>info</code></td><td>RabbitMQ consumer started</td><td><code>queue</code></td></tr>
-      <tr><td><code>info</code></td><td>RabbitMQ consumer stopped gracefully</td><td>—</td></tr>
-      <tr><td><code>info</code></td><td>Received SIGTERM - stopping consumer gracefully</td><td>—</td></tr>
-      <tr><td><code>info</code></td><td>Received SIGINT - stopping consumer gracefully</td><td>—</td></tr>
-    </tbody>
-  </table>
+      <article class="pattern-card">
+        <div class="pattern-card-head">
+          <div class="pattern-card-title">
+            <span class="pattern-badge">Failure Path</span>
+            <h3>Retry and dead-letter flow</h3>
+          </div>
+        </div>
+        <p>Failures stay visible without losing structure. The error line keeps the exception object in context, and the retry lines carry the backoff state.</p>
+        <div class="pattern-steps">
+          <div class="pattern-step">
+            <div class="pattern-step-index">1</div>
+            <div class="pattern-step-body"><strong>Processing failure</strong><span>The consumer emits one scoped error line with <code>event_type</code>, <code>retry_count</code>, and <code>exception</code>.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">2</div>
+            <div class="pattern-step-body"><strong>Backoff</strong><span><code>requeueWithDelay()</code> logs the next retry count and the computed delay in milliseconds.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">3</div>
+            <div class="pattern-step-body"><strong>Final attempt</strong><span>The same message shape is reused through every retry, which makes multi-attempt traces easy to grep.</span></div>
+          </div>
+          <div class="pattern-step">
+            <div class="pattern-step-index">4</div>
+            <div class="pattern-step-body"><strong>DLQ handoff</strong><span>Once retries are exhausted, the consumer logs the dead-letter decision as a warning before the message is nacked.</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
 
-  <h3>Event Processing Pipeline</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>info</code></td><td>Duplicate event skipped</td><td><code>event_id</code>, <code>event_type</code></td></tr>
-      <tr><td><code>info</code></td><td>Dispatching to handler</td><td><code>handler</code> (class name), <code>event_type</code></td></tr>
-      <tr><td><code>warning</code></td><td>No handler for event</td><td><code>event_type</code></td></tr>
-    </tbody>
-  </table>
+    <div class="terminal-block">
+<span class="t-gray"># Successful event</span>
+[INFO] [EmployeeController][store] Employee created {"employee_id":1,"country":"USA","request_id":"abc-123"}
+[INFO] [RabbitMQPublisher][publish] Event published {"routing_key":"employee.created.usa","event_id":"evt-456","request_id":"abc-123"}
+[INFO] [EventProcessingPipeline][process] Dispatching event to handler {"handler":"App\\Application\\EventProcessing\\Handlers\\EmployeeCreatedHandler","event_type":"EmployeeCreated","event_id":"evt-456","country":"USA"}
+[INFO] [EmployeeCreatedHandler][handle] Employee created event handled {"employee_id":1,"country":"USA"}
+[INFO] [RabbitMQConsumer][processMessage] Broadcast sent via Reverb {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","channels":["employees","country.USA"]}
+[INFO] [RabbitMQConsumer][processMessage] Event fully processed {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","duration_ms":45.12,"retry_count":0}
 
-  <h3>Event Handlers</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>info</code></td><td>EmployeeCreated handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
-      <tr><td><code>info</code></td><td>EmployeeUpdated handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
-      <tr><td><code>info</code></td><td>EmployeeDeleted handled</td><td><code>employee_id</code>, <code>country</code></td></tr>
-    </tbody>
-  </table>
+<span class="t-gray"># Failed event</span>
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":0,"exception":"&lt;normalized Throwable&gt;"}
+[INFO] [RabbitMQConsumer][requeueWithDelay] Message re-queued for retry {"retry_count":1,"delay_ms":1000}
+[ERROR] [RabbitMQConsumer][processMessage] Failed to process RabbitMQ message {"event_type":"EmployeeCreated","retry_count":3,"exception":"&lt;normalized Throwable&gt;"}
+[WARNING] [RabbitMQConsumer][processMessage] Message exhausted retries; routing to DLQ {"event_type":"EmployeeCreated","retry_count":3}
+    </div>
 
-  <h3>Message Processing &amp; Retries</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>info</code></td><td>Event fully processed</td><td><code>event_type</code>, <code>employee_id</code>, <code>country</code>, <code>duration_ms</code>, <code>retry_count</code></td></tr>
-      <tr><td><code>error</code></td><td>Failed to process RabbitMQ message</td><td><code>event_type</code>, <code>retry_count</code>, <code>error</code></td></tr>
-      <tr><td><code>info</code></td><td>Message re-queued for retry</td><td><code>retry_count</code>, <code>delay_ms</code></td></tr>
-      <tr><td><code>warning</code></td><td>Message exhausted retries, sending to DLQ</td><td><code>event_type</code>, <code>retry_count</code></td></tr>
-    </tbody>
-  </table>
+    <p class="log-meta">The consumer log currently records <code>employees</code> and <code>country.{country}</code> in its <code>channels</code> field. The broadcast event itself also fans out to <code>checklist.{country}</code>.</p>
+  </div>
 
-  <h3>Broadcasting</h3>
-  <table>
-    <thead><tr><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>info</code></td><td>Broadcast sent via Reverb</td><td><code>event_type</code>, <code>employee_id</code>, <code>country</code>, <code>channels</code></td></tr>
-      <tr><td><code>warning</code></td><td>Broadcast to Reverb failed (non-fatal)</td><td><code>event_type</code>, <code>error</code></td></tr>
-    </tbody>
-  </table>
+  <div class="content-tab-panel" data-tab-panel="logging-commands">
+    <table>
+      <thead><tr><th>Command</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>docker compose logs hr-service</code></td><td>HR API writes and publish flow</td></tr>
+        <tr><td><code>docker compose logs hub-service</code></td><td>Hub read endpoints and health</td></tr>
+        <tr><td><code>docker compose logs hub-consumer</code></td><td>Event processing, broadcast, retries, and DLQ flow</td></tr>
+        <tr><td><code>docker compose logs reverb</code></td><td>WebSocket server activity</td></tr>
+        <tr><td><code>docker compose logs -f --tail=40 hr-service hub-consumer reverb rabbitmq</code></td><td>Common live view across the moving parts</td></tr>
+        <tr><td><code>docker compose logs -f</code></td><td>Full live stream</td></tr>
+        <tr><td><code>docker compose logs hub-consumer 2&gt;&amp;1 | grep '\[RabbitMQConsumer\]'</code></td><td>Consumer-only lines</td></tr>
+        <tr><td><code>docker compose logs hub-consumer 2&gt;&amp;1 | grep '"event_id"'</code></td><td>Trace one event through the pipeline</td></tr>
+      </tbody>
+    </table>
 
-  <h3>Controllers &amp; Health</h3>
-  <table>
-    <thead><tr><th>File</th><th>Level</th><th>Message</th><th>Context</th></tr></thead>
-    <tbody>
-      <tr><td><code>EmployeeController</code></td><td><code>debug</code></td><td>Employee list served</td><td><code>country</code></td></tr>
-      <tr><td><code>ChecklistController</code></td><td><code>debug</code></td><td>Checklist served</td><td><code>country</code></td></tr>
-      <tr><td><code>HealthController</code></td><td><code>warning</code></td><td>Hub service health check degraded</td><td><code>checks</code></td></tr>
-    </tbody>
-  </table>
-
-  <h2>Exception Handling</h2>
-  <p>Both services use a custom <code>Handler</code> in <code>app/Exceptions/Handler.php</code>:</p>
-  <pre><code>$this->renderable(function (Throwable $e) {
-    Log::error('Unhandled exception', [
-        'exception' => get_class($e),
-        'message'   => $e->getMessage(),
-    ]);
-    // Returns standardized JSON error envelope
-});</code></pre>
-  <p>This catches all unhandled exceptions, logs them at <code>error</code> level, and returns a consistent JSON response with the error code and message.</p>
-
-  <h2>Event Pipeline Log Trace</h2>
-  <p>A successful employee creation produces this log sequence across services:</p>
-  <pre><code># HR Service (hr-service container)
-[INFO] Employee created                  {"employee_id":1,"country":"USA","request_id":"abc-123"}
-[INFO] Event published                   {"routing_key":"employee.created.usa","event_id":"evt-456","request_id":"abc-123"}
-
-# Hub Service (hub-consumer container)
-[INFO] Dispatching to handler            {"handler":"EmployeeCreatedHandler","event_type":"EmployeeCreated"}
-[INFO] EmployeeCreated handled           {"employee_id":1,"country":"USA"}
-[INFO] Broadcast sent via Reverb         {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","channels":["employees","country.USA","checklist.USA"]}
-[INFO] Event fully processed             {"event_type":"EmployeeCreated","employee_id":1,"country":"USA","duration_ms":45,"retry_count":0}</code></pre>
-
-  <h2>Failed Event Log Trace</h2>
-  <p>When processing fails and retries exhaust:</p>
-  <pre><code># Attempt 1
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":0,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":1,"delay_ms":1000}
-
-# Attempt 2
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":1,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":2,"delay_ms":2000}
-
-# Attempt 3
-[ERROR] Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":2,"error":"Connection refused"}
-[INFO]  Message re-queued for retry         {"retry_count":3,"delay_ms":4000}
-
-# Attempt 4 — max retries exceeded
-[ERROR]   Failed to process RabbitMQ message  {"event_type":"EmployeeCreated","retry_count":3,"error":"Connection refused"}
-[WARNING] Message exhausted retries, sending to DLQ  {"event_type":"EmployeeCreated","retry_count":3}</code></pre>
-
-  <h2>Accessing Logs</h2>
-  <table>
-    <thead><tr><th>Command</th><th>What It Shows</th></tr></thead>
-    <tbody>
-      <tr><td><code>docker compose logs hr-service</code></td><td>HR API logs (CRUD operations, event publishing)</td></tr>
-      <tr><td><code>docker compose logs hub-service</code></td><td>Hub API logs (employee list, checklist, schema endpoints)</td></tr>
-      <tr><td><code>docker compose logs hub-consumer</code></td><td>Event pipeline logs (processing, handlers, retries, broadcasts)</td></tr>
-      <tr><td><code>docker compose logs reverb</code></td><td>WebSocket server logs</td></tr>
-      <tr><td><code>docker compose logs -f</code></td><td>Follow all service logs in real-time</td></tr>
-      <tr><td><code>docker compose logs hub-consumer 2>&amp;1 | grep ERROR</code></td><td>Filter for errors only</td></tr>
-      <tr><td><code>docker compose logs hub-consumer 2>&amp;1 | grep "event_id"</code></td><td>Trace a specific event through the pipeline</td></tr>
-    </tbody>
-  </table>
+    <div class="callout callout-success">
+      For demos and local debugging, <code>docker compose logs -f --tail=40 hr-service hub-consumer reverb rabbitmq</code> is the most useful default view: enough history to catch the last event, but not so much noise that retries and broadcasts disappear off screen.
+    </div>
+  </div>
+</div>

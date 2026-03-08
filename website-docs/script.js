@@ -12,7 +12,7 @@
 
   /* ── Panel content loading ─────────────────────────── */
   const loadedPanels = new Set();
-  const docsVersion = '12';
+  const docsVersion = '16';
 
   function sanitizePanelHtml(html) {
     return html.replace(/<!-- Code injected by live-server -->[\s\S]*?<\/script>/gi, '');
@@ -270,6 +270,37 @@
     });
   }
 
+  function enhanceContentTabs(panel) {
+    panel.querySelectorAll('[data-inline-tabs]').forEach(tabRoot => {
+      if (tabRoot.dataset.tabsBound === 'true') return;
+
+      const buttons = Array.from(tabRoot.querySelectorAll('[data-tab-target]'));
+      const tabPanels = Array.from(tabRoot.querySelectorAll('[data-tab-panel]'));
+
+      if (!buttons.length || !tabPanels.length) return;
+
+      const activateTab = (target) => {
+        buttons.forEach(button => {
+          const active = button.dataset.tabTarget === target;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-selected', active ? 'true' : 'false');
+          button.tabIndex = active ? 0 : -1;
+        });
+
+        tabPanels.forEach(tabPanel => {
+          tabPanel.classList.toggle('active', tabPanel.dataset.tabPanel === target);
+        });
+      };
+
+      buttons.forEach(button => {
+        button.addEventListener('click', () => activateTab(button.dataset.tabTarget));
+      });
+
+      tabRoot.dataset.tabsBound = 'true';
+      activateTab(buttons.find(button => button.classList.contains('active'))?.dataset.tabTarget || buttons[0].dataset.tabTarget);
+    });
+  }
+
   /* ── JSON Syntax Highlighting ────────────────────── */
   function highlightJSON(panel) {
     panel.querySelectorAll('pre:not(.mermaid) code').forEach(code => {
@@ -379,6 +410,7 @@
     await loadPanel(id);
     const panelEl = document.getElementById(id);
     if (panelEl) {
+      enhanceContentTabs(panelEl);
       highlightJSON(panelEl);
       injectImageZoomButtons(panelEl);
       injectCopyButtons(panelEl);

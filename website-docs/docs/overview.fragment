@@ -2,6 +2,25 @@
 
   <p>This <strong>event-driven employee onboarding platform</strong> was built for a Senior Backend Engineer challenge. Two Laravel 12 services exchange messages through RabbitMQ, push real-time updates over WebSockets, cache hot reads in Redis, and expose metrics to Prometheus and Grafana.</p>
 
+  <div class="content-tabs" data-inline-tabs>
+    <div class="content-tab-list" role="tablist" aria-label="Overview content tabs">
+      <button type="button" class="content-tab-button active" role="tab" aria-selected="true" data-tab-target="overview-summary">
+        <span class="content-tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 3.75A1.75 1.75 0 0 1 5.75 2h8.5A1.75 1.75 0 0 1 16 3.75v12.5A1.75 1.75 0 0 1 14.25 18h-8.5A1.75 1.75 0 0 1 4 16.25V3.75Zm2 .75a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5H6Zm0 4a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5H6Zm0 4a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5H6Z"/></svg>
+        </span>
+        <span>Summary</span>
+      </button>
+      <button type="button" class="content-tab-button content-tab-button-cta" role="tab" aria-selected="false" data-tab-target="overview-demo">
+        <span class="content-tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm-1.28-11.22a.75.75 0 0 1 1.155-.633l3.5 2.22a.75.75 0 0 1 0 1.27l-3.5 2.22A.75.75 0 0 1 8.72 11.22V6.78Z"/></svg>
+        </span>
+        <span>Watch Demo</span>
+        <span class="content-tab-meta">9:52</span>
+      </button>
+    </div>
+
+    <div class="content-tab-panel active" data-tab-panel="overview-summary">
+
   <div class="stat-grid">
     <div class="stat-box"><div class="stat-number">10</div><div class="stat-label">Docker Services</div></div>
     <div class="stat-box"><div class="stat-number">175</div><div class="stat-label">Tests Passing</div></div>
@@ -86,3 +105,16 @@ graph TB
     style HR fill:#eff6ff,stroke:#3b82f6,color:#1e3a5f
     style Hub fill:#f0fdf4,stroke:#22c55e,color:#14532d
   </pre>
+    </div>
+
+    <div class="content-tab-panel" data-tab-panel="overview-demo">
+      <figure class="screenshot-figure video-figure">
+        <video controls preload="metadata" playsinline>
+          <source src="screenshots/demo-video.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+        <figcaption>Recorded walkthrough of the local platform covering HR writes, Hub projections, WebSocket updates, and monitoring.</figcaption>
+      </figure>
+      <p class="video-note">If the embedded player does not load, open the asset directly: <a href="screenshots/demo-video.mp4">demo-video.mp4</a>.</p>
+    </div>
+  </div>

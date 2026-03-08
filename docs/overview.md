@@ -2,6 +2,13 @@
 
 An Event-Driven Multi-Country Employee Onboarding Platform built as a Senior Backend Engineer coding challenge. Two independent Laravel 12 microservices communicate asynchronously through RabbitMQ, with real-time WebSocket updates, Redis caching, and full observability through Prometheus + Grafana.
 
+## Demo Video
+
+A short walkthrough is available in the hosted Overview page and as a repository asset:
+
+- [Hosted docs overview](https://ahmedsamirsherif.github.io/laravel-event-driven-microservices-blueprint/#overview)
+- [Demo video asset](../website-docs/screenshots/demo-video.mp4)
+
 | | |
 |---|---|
 | Docker Services | 10 |
